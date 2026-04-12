@@ -5,8 +5,8 @@ repo_url: https://github.com/pardeike/BrrainzBot
 repo_name: pardeike/BrrainzBot
 theme:
   name: material
-  logo: assets/brand/brrainzbot-mark.svg
-  favicon: assets/brand/brrainzbot-mark.svg
+  logo: assets/brand/brrainzbot-mark.png
+  favicon: assets/brand/brrainzbot-mark.png
   palette:
     primary: custom
     accent: custom
