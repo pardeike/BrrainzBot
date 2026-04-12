@@ -122,7 +122,7 @@ If your server already uses `@everyone` for normal posting, BrrainzBot can help 
 ./brrainzbot set-members <serverId>
 ```
 
-Use those helper commands after `setup` and `doctor`, not before your first local install.
+Use those helper commands after `setup`. If you leave the `MEMBER` role blank during first setup, run `create-member` before `doctor`.
 
 ## 9. Create `#welcome`
 
@@ -134,6 +134,8 @@ Recommended `MEMBER` model:
 
 - `@everyone`: can view `#welcome`
 - `MEMBER`: cannot view `#welcome`
+
+That can be done on `#welcome` itself or on its parent category if the channel inherits from it.
 
 ## 10. Set Public Channel Permissions
 
@@ -177,7 +179,17 @@ Back in the terminal:
 ./brrainzbot setup
 ```
 
-## 14. Run Doctor
+If you do not have a real `MEMBER` role yet, leave that field blank for now.
+
+## 14. Create or Sync `MEMBER` if Needed
+
+```bash
+./brrainzbot create-member <serverId>
+```
+
+Skip this if you already entered a real `MEMBER` role ID in setup.
+
+## 15. Run Doctor
 
 ```bash
 ./brrainzbot doctor
@@ -185,13 +197,13 @@ Back in the terminal:
 
 Fix anything it reports before you turn the server on.
 
-## 15. Enable the Server
+## 16. Enable the Server
 
 ```bash
 ./brrainzbot enable <serverId>
 ```
 
-## 16. Start the Bot
+## 17. Start the Bot
 
 ```bash
 ./brrainzbot run

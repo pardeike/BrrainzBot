@@ -162,7 +162,10 @@ public sealed class OnboardingModule(
             session.LastOutcome = VerificationOutcome.Uncertain;
             session.CooldownUntil = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.Cooldown);
             await sessionStore.UpsertAsync(session, CancellationToken.None);
-            await NotifyOwnerAsync(serverSettings, $"Technical failure during verification for {modal.User.Username} ({modal.User.Id}). Error: {ex.Message}");
+            if (serverSettings.Onboarding.NotifyOwnerOnTechnicalFailure)
+            {
+                await NotifyOwnerAsync(serverSettings, $"Technical failure during verification for {modal.User.Username} ({modal.User.Id}). Error: {ex.Message}");
+            }
             await auditLog.WriteAsync("verification_technical_failure", new
             {
                 serverId,

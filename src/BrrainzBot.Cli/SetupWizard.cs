@@ -155,10 +155,10 @@ internal static class SetupWizard
     {
         WriteSectionHeader("IDs and roles", $"Create the roles and channels first, then copy their IDs. Guide: {DiscordSetupUrl}");
         draft.WelcomeChannelId = AskSnowflake("Welcome channel ID", draft.WelcomeChannelId);
-        draft.MemberRoleId = AskSnowflake(
+        draft.MemberRoleId = AskOptionalSnowflake(
             "MEMBER role ID",
             draft.MemberRoleId,
-            "Use a real MEMBER role. If you still need to create it, run `brrainzbot create-member <serverId>` after setup.");
+            "Use a real MEMBER role. If you do not have one yet, leave this blank, finish setup, then run `brrainzbot create-member <serverId>`.");
     }
 
     private static void EditOnboarding(ServerDraft draft)
@@ -202,7 +202,7 @@ internal static class SetupWizard
         table.AddRow("Onboarding", "[green]core[/]");
         table.AddRow("Spam cleanup", draft.EnableSpamGuard ? "[green]on[/]" : "[grey]off[/]");
         table.AddRow("Welcome channel ID", draft.WelcomeChannelId == 0 ? "[red]missing[/]" : draft.WelcomeChannelId.ToString());
-        table.AddRow("MEMBER role ID", draft.MemberRoleId == 0 ? "[red]missing[/]" : draft.MemberRoleId.ToString());
+        table.AddRow("MEMBER role ID", draft.MemberRoleId == 0 ? "[yellow]create later[/]" : draft.MemberRoleId.ToString());
         table.AddRow("Owner user ID", draft.OwnerUserId == 0 ? "[red]missing[/]" : draft.OwnerUserId.ToString());
 
         if (draft.EnableSpamGuard)
@@ -264,6 +264,34 @@ internal static class SetupWizard
         return AnsiConsole.Prompt(textPrompt);
     }
 
+    private static ulong AskOptionalSnowflake(string prompt, ulong? existingValue, string? helpText = null)
+    {
+        if (!string.IsNullOrWhiteSpace(helpText))
+            AnsiConsole.MarkupLine($"[grey]{Markup.Escape(helpText)}[/]");
+
+        var effectivePrompt = existingValue is > 0
+            ? $"{prompt} [[leave blank to keep current]]:"
+            : $"{prompt} [[leave blank to create later]]:";
+
+        var answer = AnsiConsole.Prompt(
+            new TextPrompt<string>(effectivePrompt)
+                .AllowEmpty()
+                .Validate(value =>
+                {
+                    if (string.IsNullOrWhiteSpace(value))
+                        return ValidationResult.Success();
+
+                    return ulong.TryParse(value, out var parsed) && parsed > 0
+                        ? ValidationResult.Success()
+                        : ValidationResult.Error("[red]Enter a Discord snowflake ID or leave it blank.[/]");
+                }));
+
+        if (string.IsNullOrWhiteSpace(answer))
+            return existingValue is > 0 ? existingValue.Value : 0;
+
+        return ulong.Parse(answer);
+    }
+
     private static int AskInt(string prompt, int defaultValue) => AnsiConsole.Prompt(
         new TextPrompt<int>($"{prompt}:").DefaultValue(defaultValue));
 
@@ -296,6 +324,8 @@ internal static class SetupWizard
         public string FirstQuestionLabel { get; set; } = "What brought you here?";
         public string SecondQuestionLabel { get; set; } = "What do you want to do here?";
         public string ThirdQuestionLabel { get; set; } = "Paraphrase one expectation or rule.";
+        public bool NotifyOwnerOnUncertain { get; set; } = true;
+        public bool NotifyOwnerOnTechnicalFailure { get; set; } = true;
         public ulong HoneypotChannelId { get; set; }
         public int PastMessageIntervalSeconds { get; set; } = 300;
         public int FutureMessageIntervalSeconds { get; set; } = 300;
@@ -330,6 +360,8 @@ internal static class SetupWizard
                 FirstQuestionLabel = existing.Onboarding.FirstQuestionLabel,
                 SecondQuestionLabel = existing.Onboarding.SecondQuestionLabel,
                 ThirdQuestionLabel = existing.Onboarding.ThirdQuestionLabel,
+                NotifyOwnerOnUncertain = existing.Onboarding.NotifyOwnerOnUncertain,
+                NotifyOwnerOnTechnicalFailure = existing.Onboarding.NotifyOwnerOnTechnicalFailure,
                 HoneypotChannelId = existing.SpamGuard.HoneypotChannelId,
                 PastMessageIntervalSeconds = existing.SpamGuard.PastMessageIntervalSeconds,
                 FutureMessageIntervalSeconds = existing.SpamGuard.FutureMessageIntervalSeconds,
@@ -360,8 +392,8 @@ internal static class SetupWizard
                 MaxAttempts = MaxAttempts,
                 Cooldown = TimeSpan.FromMinutes(CooldownMinutes),
                 StaleTimeout = TimeSpan.FromHours(StaleTimeoutHours),
-                NotifyOwnerOnUncertain = true,
-                NotifyOwnerOnTechnicalFailure = true,
+                NotifyOwnerOnUncertain = NotifyOwnerOnUncertain,
+                NotifyOwnerOnTechnicalFailure = NotifyOwnerOnTechnicalFailure,
                 FirstQuestionLabel = FirstQuestionLabel,
                 SecondQuestionLabel = SecondQuestionLabel,
                 ThirdQuestionLabel = ThirdQuestionLabel

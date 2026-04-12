@@ -54,6 +54,12 @@ Use one real `MEMBER` role:
 
 This is the bot's core model. There is no second newcomer role anymore.
 
+On the first setup pass, `MEMBER` can be left blank and created right after setup with:
+
+```bash
+./brrainzbot create-member <serverId>
+```
+
 If your server already uses `@everyone` for normal posting, use:
 
 ```bash

@@ -165,6 +165,33 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
+    public async Task DoctorRespectsWelcomeVisibilityInheritedFromParentCategory()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            welcomePermissionOverwrites: "[]",
+            categoryPermissionOverwrites: """
+                [
+                  { "id": "1000", "type": 0, "allow": "0", "deny": "1024" }
+                ]
+                """)));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.DoesNotContain(report.Messages, message => message.Code == "discord.welcome.member.visible");
+        Assert.DoesNotContain(report.Messages, message => message.Code == "discord.welcome.everyone.hidden");
+    }
+
+    [Fact]
     public async Task DoctorWarnsWhenWelcomeHidesEveryone()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
@@ -402,6 +429,7 @@ public sealed class BotDoctorTests
 
     private static Func<HttpRequestMessage, HttpResponseMessage> HealthyResponder(
         string? welcomePermissionOverwrites = null,
+        string? categoryPermissionOverwrites = null,
         ulong? everyonePermissions = null,
         ulong? memberPermissions = null,
         ulong? botPermissions = null,
@@ -414,9 +442,10 @@ public sealed class BotDoctorTests
             ]
             """;
 
-        everyonePermissions ??= 0;
+        everyonePermissions ??= (ulong)GuildPermission.ViewChannel;
         memberPermissions ??= 0;
         botPermissions ??= AllRequiredPermissions();
+        categoryPermissionOverwrites ??= "[]";
 
         var pages = memberPages.Length == 0
             ? new[]
@@ -442,8 +471,14 @@ public sealed class BotDoctorTests
                 "/api/v10/guilds/123/channels" => JsonResponse($$"""
                     [
                       {
+                        "id": "789",
+                        "name": "welcome-category",
+                        "permission_overwrites": {{categoryPermissionOverwrites}}
+                      },
+                      {
                         "id": "456",
                         "name": "welcome",
+                        "parent_id": "789",
                         "permission_overwrites": {{welcomePermissionOverwrites}}
                       },
                       {

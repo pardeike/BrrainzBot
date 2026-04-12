@@ -13,9 +13,10 @@ It is built for admins who want plain setup, plain docs, and calm day-to-day beh
 
 1. Read the [Discord setup guide](docs/discord-setup.md).
 2. Run `brrainzbot setup`.
-3. Run `brrainzbot doctor`.
-4. Turn one server on with `brrainzbot enable <serverId>`.
-5. Run `brrainzbot run`.
+3. If you left `MEMBER` blank, run `brrainzbot create-member <serverId>`.
+4. Run `brrainzbot doctor`.
+5. Turn one server on with `brrainzbot enable <serverId>`.
+6. Run `brrainzbot run`.
 
 If you only manage one server, `brrainzbot enable` and `brrainzbot disable` also work without an ID.
 

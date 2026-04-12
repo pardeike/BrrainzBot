@@ -42,6 +42,8 @@ What they do:
 - `create-member` creates or fixes a real `MEMBER` role and copies the current `@everyone` channel/category overrides to it
 - `set-members` gives that `MEMBER` role to existing non-bot users who are not in active onboarding
 
+If `setup` was your first local run, `create-member` can be the next command before `doctor`.
+
 Onboarding itself is not optional. Spam cleanup is.
 
 Run `create-member` first. Then run `set-members`. Only after that should you remove normal member permissions from `@everyone`.
@@ -110,7 +112,7 @@ Move it above:
 Run `doctor` and check:
 
 - welcome channel ID
-- `#welcome` permissions
+- `#welcome` permissions on the channel or its parent category
 - role visibility rules
 
 ### New users can still post too early

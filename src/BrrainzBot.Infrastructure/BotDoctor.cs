@@ -78,7 +78,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             if (server.WelcomeChannelId == 0)
                 report.AddError("server.welcome.zero", $"{server.Name}: WelcomeChannelId must not be zero.");
             if (server.MemberRoleId == 0)
-                report.AddError("server.memberrole.zero", $"{server.Name}: MemberRoleId must not be zero.");
+                report.AddError("server.memberrole.zero", $"{server.Name}: MemberRoleId is not set yet. Run `brrainzbot create-member {server.ServerId}` and then `brrainzbot doctor` again.");
             if (server.MemberRoleId == server.ServerId && server.MemberRoleId != 0)
                 report.AddError("server.memberrole.everyone.invalid", $"{server.Name}: MemberRoleId must point to a real MEMBER role. Run `brrainzbot create-member {server.ServerId}` and update setup.");
             if (server.EnableSpamGuard && server.SpamGuard.HoneypotChannelId == 0)
@@ -127,8 +127,8 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             return;
         }
 
-        var channels = await LoadChannelsAsync(client, server, report, cancellationToken);
         var roles = await LoadRolesAsync(client, server, report, cancellationToken);
+        var channels = await LoadChannelsAsync(client, server, report, cancellationToken);
 
         if (channels != null)
         {
@@ -136,9 +136,9 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             {
                 report.AddError("discord.welcome.notfound", $"{server.Name}: WelcomeChannelId does not exist in the server.");
             }
-            else
+            else if (roles != null)
             {
-                ValidateWelcomeLayout(server, welcomeChannel, report);
+                ValidateWelcomeLayout(server, welcomeChannel, channels, roles, report);
             }
 
             if (server.EnableSpamGuard && !channels.ContainsKey(server.SpamGuard.HoneypotChannelId))
@@ -147,7 +147,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 
         if (roles != null)
         {
-            if (!roles.ContainsKey(server.MemberRoleId))
+            if (server.MemberRoleId != 0 && !roles.ContainsKey(server.MemberRoleId))
                 report.AddError("discord.memberrole.notfound", $"{server.Name}: MemberRoleId does not exist in the server.");
 
             await ValidateRoleHierarchyAsync(client, botUserId, server, roles, report, cancellationToken);
@@ -201,7 +201,11 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             channels[channelId] = new ChannelSnapshot(
                 channelId,
                 channelElement.GetProperty("name").GetString() ?? channelId.ToString(),
-                overwrites);
+                    channelElement.TryGetProperty("parent_id", out var parentIdElement)
+                        && ulong.TryParse(parentIdElement.GetString(), out var parentId)
+                        ? parentId
+                        : null,
+                    overwrites);
         }
 
         return channels;
@@ -235,23 +239,27 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                         : 0));
     }
 
-    private static void ValidateWelcomeLayout(ServerSettings server, ChannelSnapshot welcomeChannel, DiagnosticReport report)
+    private static void ValidateWelcomeLayout(
+        ServerSettings server,
+        ChannelSnapshot welcomeChannel,
+        IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        DiagnosticReport report)
     {
-        var everyoneOverwrite = welcomeChannel.FindRoleOverwrite(server.ServerId);
-        var memberOverwrite = welcomeChannel.FindRoleOverwrite(server.MemberRoleId);
-
-        if (Denies(everyoneOverwrite, ChannelPermission.ViewChannel))
+        if (!HasEffectiveViewAccess(welcomeChannel, channels, roles, [server.ServerId]))
         {
             report.AddWarning(
                 "discord.welcome.everyone.hidden",
-                $"{server.Name}: #welcome should stay visible to people who do not have MEMBER yet. Remove the @everyone ViewChannel deny there.");
+                $"{server.Name}: people without MEMBER cannot currently see #welcome. Allow ViewChannel for them on the channel or its parent category.");
         }
 
-        if (!Denies(memberOverwrite, ChannelPermission.ViewChannel))
+        if (server.MemberRoleId != 0
+            && roles.ContainsKey(server.MemberRoleId)
+            && HasEffectiveViewAccess(welcomeChannel, channels, roles, [server.ServerId, server.MemberRoleId]))
         {
             report.AddWarning(
                 "discord.welcome.member.visible",
-                $"{server.Name}: #welcome should deny ViewChannel for MEMBER.");
+                $"{server.Name}: MEMBER can still see #welcome. Deny ViewChannel for MEMBER on the channel or its parent category.");
         }
     }
 
@@ -417,10 +425,66 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         }
     }
 
-    private static bool Denies(PermissionOverwriteSnapshot? overwrite, ChannelPermission permission) =>
-        overwrite != null && (overwrite.Deny & PermissionBit(permission)) != 0;
-
     private static ulong PermissionBit(ChannelPermission permission) => (ulong)permission;
+
+    private static bool HasEffectiveViewAccess(
+        ChannelSnapshot channel,
+        IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        IReadOnlyList<ulong> roleIds)
+    {
+        var permissions = roleIds
+            .Where(roles.ContainsKey)
+            .Select(roleId => roles[roleId].PermissionsRawValue)
+            .Aggregate(0UL, static (combined, next) => combined | next);
+
+        if ((permissions & (ulong)GuildPermission.Administrator) != 0)
+            return true;
+
+        permissions = ApplyEffectiveOverwrites(channel, channels, roleIds, permissions);
+        return (permissions & PermissionBit(ChannelPermission.ViewChannel)) != 0;
+    }
+
+    private static ulong ApplyEffectiveOverwrites(
+        ChannelSnapshot channel,
+        IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        IReadOnlyList<ulong> roleIds,
+        ulong permissions)
+    {
+        if (channel.ParentCategoryId is { } parentId
+            && channels.TryGetValue(parentId, out var parentCategory))
+        {
+            permissions = ApplyOverwrites(parentCategory, roleIds, permissions);
+        }
+
+        return ApplyOverwrites(channel, roleIds, permissions);
+    }
+
+    private static ulong ApplyOverwrites(ChannelSnapshot channel, IReadOnlyList<ulong> roleIds, ulong permissions)
+    {
+        var everyoneRoleId = roleIds[0];
+        if (channel.FindRoleOverwrite(everyoneRoleId) is { } everyoneOverwrite)
+        {
+            permissions &= ~everyoneOverwrite.Deny;
+            permissions |= everyoneOverwrite.Allow;
+        }
+
+        ulong combinedAllow = 0;
+        ulong combinedDeny = 0;
+
+        foreach (var roleId in roleIds.Skip(1))
+        {
+            if (channel.FindRoleOverwrite(roleId) is not { } roleOverwrite)
+                continue;
+
+            combinedAllow |= roleOverwrite.Allow;
+            combinedDeny |= roleOverwrite.Deny;
+        }
+
+        permissions &= ~combinedDeny;
+        permissions |= combinedAllow;
+        return permissions;
+    }
 
     private static IReadOnlyList<string> DescribeGuildPermissions(ulong rawPermissions) => Enum
         .GetValues<GuildPermission>()
@@ -453,7 +517,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         return string.Join(' ', parts);
     }
 
-    private sealed record ChannelSnapshot(ulong Id, string Name, List<PermissionOverwriteSnapshot> Overwrites)
+    private sealed record ChannelSnapshot(ulong Id, string Name, ulong? ParentCategoryId, List<PermissionOverwriteSnapshot> Overwrites)
     {
         public PermissionOverwriteSnapshot? FindRoleOverwrite(ulong roleId) =>
             Overwrites.FirstOrDefault(overwrite => overwrite.Type == 0 && overwrite.Id == roleId);

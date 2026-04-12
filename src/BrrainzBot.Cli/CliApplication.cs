@@ -79,10 +79,15 @@ internal static class CliApplication
         AnsiConsole.MarkupLine($"[green]Saved configuration to[/] {Markup.Escape(paths.ConfigFilePath)}");
         AnsiConsole.MarkupLine($"[green]Saved secrets to[/] {Markup.Escape(paths.SecretsFilePath)}");
         AnsiConsole.MarkupLine("Next steps:");
-        AnsiConsole.MarkupLine("  1. Run [aqua]brrainzbot doctor[/] to validate the setup.");
-        AnsiConsole.MarkupLine("  2. Run [aqua]brrainzbot status[/] to review your configured servers.");
-        AnsiConsole.MarkupLine("  3. Use [aqua]brrainzbot enable <serverId>[/] when you are ready to go live.");
-        AnsiConsole.MarkupLine("  4. Run [aqua]brrainzbot run[/] when you are ready.");
+        var step = 1;
+        if (result.Settings.Servers.Any(server => server.MemberRoleId == 0))
+        {
+            AnsiConsole.MarkupLine($"  {step++}. If you left MEMBER blank for any server, run [aqua]brrainzbot create-member <serverId>[/] first.");
+        }
+        AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot doctor[/] to validate the setup.");
+        AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot status[/] to review your configured servers.");
+        AnsiConsole.MarkupLine($"  {step++}. Use [aqua]brrainzbot enable <serverId>[/] when you are ready to go live.");
+        AnsiConsole.MarkupLine($"  {step}. Run [aqua]brrainzbot run[/] when you are ready.");
         return 0;
     }
 
