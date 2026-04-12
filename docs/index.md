@@ -34,15 +34,22 @@ hide:
           <strong>Manual updates</strong>
           No background version checks. No silent changes.
         </div>
+        <div class="hero-point hero-point-note">
+          <strong>Good defaults</strong>
+          Clear setup. Clear copy. Clean behavior in Discord.
+        </div>
       </div>
     </div>
     <div class="hero-visual reveal">
       <div class="hero-card hero-card-bot">
-        <img src="assets/illustrations/fluffy-bot.png" alt="A soft, hand-painted bot mark for BrrainzBot on a bright background.">
-      </div>
-      <div class="hero-mini">
-        <strong>Good defaults</strong>
-        Clear setup. Clear copy. Clean behavior in Discord.
+        <div class="hero-bot-stage">
+          <img class="hero-bot-base" src="assets/illustrations/fluffy-bot.png" alt="A soft, hand-painted bot mark for BrrainzBot on a bright background.">
+          <div class="hero-mini">
+            <strong>Good defaults</strong>
+            Clear setup. Clear copy. Clean behavior in Discord.
+          </div>
+          <img class="hero-bot-overlay" src="assets/illustrations/fluffy-bot.png" alt="" aria-hidden="true">
+        </div>
       </div>
     </div>
   </div>
