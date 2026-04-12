@@ -69,6 +69,16 @@ body {
   color: var(--bb-blue);
 }
 
+.md-typeset :where(p, li) {
+  font-weight: 300;
+}
+
+.hero-shell :where(p, li),
+.bb-section :where(p, li),
+.cta-panel :where(p, li) {
+  font-weight: 200;
+}
+
 .md-typeset .admonition,
 .md-typeset details {
   border-radius: 1rem;
