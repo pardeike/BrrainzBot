@@ -333,6 +333,17 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 $"{server.Name}: the bot is missing required server permissions: {string.Join(", ", missingPermissions)}.");
         }
 
+        if (roles.TryGetValue(server.ServerId, out var everyoneRole))
+        {
+            var uncopiablePermissions = DescribeGuildPermissions(everyoneRole.PermissionsRawValue & ~botPermissions.RawValue);
+            if (uncopiablePermissions.Count > 0)
+            {
+                report.AddWarning(
+                    "discord.memberrole.partial_copy",
+                    $"{server.Name}: `@everyone` has permissions the bot cannot grant to MEMBER with the current invite: {string.Join(", ", uncopiablePermissions)}. `create-member` will copy the rest and you will need to set these manually if you want them on MEMBER.");
+            }
+        }
+
         if (roles.TryGetValue(server.NewRoleId, out var newRole) && highestBotRolePosition <= newRole.Position)
         {
             report.AddError(
@@ -357,6 +368,37 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         overwrite != null && (overwrite.Deny & PermissionBit(permission)) != 0;
 
     private static ulong PermissionBit(ChannelPermission permission) => 1UL << (int)permission;
+
+    private static IReadOnlyList<string> DescribeGuildPermissions(ulong rawPermissions) => Enum
+        .GetValues<GuildPermission>()
+        .Where(permission => permission != 0 && (rawPermissions & (ulong)permission) != 0)
+        .Select(permission => FormatPermissionName(permission.ToString()))
+        .ToList();
+
+    private static string FormatPermissionName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        var parts = new List<string>();
+        var current = new System.Text.StringBuilder();
+
+        foreach (var character in name)
+        {
+            if (current.Length > 0 && char.IsUpper(character))
+            {
+                parts.Add(current.ToString());
+                current.Clear();
+            }
+
+            current.Append(character);
+        }
+
+        if (current.Length > 0)
+            parts.Add(current.ToString());
+
+        return string.Join(' ', parts);
+    }
 
     private sealed record ChannelSnapshot(ulong Id, string Name, List<PermissionOverwriteSnapshot> Overwrites)
     {

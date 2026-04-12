@@ -28,6 +28,8 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 EnsurePermission(server.CurrentUser.GuildPermissions.ManageChannels, "Manage Channels");
 
                 var everyoneRole = server.EveryoneRole;
+                var copyablePermissionsRaw = everyoneRole.Permissions.RawValue & server.CurrentUser.GuildPermissions.RawValue;
+                var skippedPermissions = DescribeGuildPermissions(everyoneRole.Permissions.RawValue & ~server.CurrentUser.GuildPermissions.RawValue);
                 var memberRole = ResolveMemberRole(server, serverSettings);
                 var createdRole = false;
                 var previousRoleId = serverSettings.MemberRoleId;
@@ -36,7 +38,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 {
                     var created = await server.CreateRoleAsync(
                         "MEMBER",
-                        everyoneRole.Permissions,
+                        new GuildPermissions(copyablePermissionsRaw),
                         color: null,
                         isHoisted: false,
                         isMentionable: false);
@@ -48,7 +50,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     await memberRole.ModifyAsync(properties =>
                     {
                         properties.Name = "MEMBER";
-                        properties.Permissions = everyoneRole.Permissions;
+                        properties.Permissions = new GuildPermissions(copyablePermissionsRaw);
                     });
                 }
 
@@ -80,7 +82,8 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     createdRole,
                     previousRoleId != memberRole.Id,
                     copiedOverwrites,
-                    removedOverwrites);
+                    removedOverwrites,
+                    skippedPermissions);
             }, cancellationToken);
         }
         catch (HttpException ex) when (IsMissingPermissions(ex))
@@ -211,6 +214,37 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
     private static string BuildMissingPermissionsHint(string commandName) =>
         $"Discord returned Missing Permissions during `{commandName}`. The usual causes are: the bot role is below NEW or MEMBER, the bot is missing Manage Roles or Manage Channels, or the server has server-wide 2FA enabled and the bot owner account does not have 2FA enabled.";
 
+    private static IReadOnlyList<string> DescribeGuildPermissions(ulong rawPermissions) => Enum
+        .GetValues<GuildPermission>()
+        .Where(permission => permission != 0 && (rawPermissions & (ulong)permission) != 0)
+        .Select(permission => FormatPermissionName(permission.ToString()))
+        .ToList();
+
+    private static string FormatPermissionName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return name;
+
+        var parts = new List<string>();
+        var current = new System.Text.StringBuilder();
+
+        foreach (var character in name)
+        {
+            if (current.Length > 0 && char.IsUpper(character))
+            {
+                parts.Add(current.ToString());
+                current.Clear();
+            }
+
+            current.Append(character);
+        }
+
+        if (current.Length > 0)
+            parts.Add(current.ToString());
+
+        return string.Join(' ', parts);
+    }
+
     private async Task<TResult> WithConnectedClientAsync<TResult>(
         Func<DiscordSocketClient, Task<TResult>> action,
         CancellationToken cancellationToken)
@@ -267,7 +301,8 @@ public sealed record CreateMemberRoleResult(
     bool CreatedRole,
     bool UpdatedConfig,
     int CopiedChannelOverrides,
-    int RemovedChannelOverrides);
+    int RemovedChannelOverrides,
+    IReadOnlyList<string> SkippedServerPermissions);
 
 public sealed record SetMembersResult(
     string ServerName,

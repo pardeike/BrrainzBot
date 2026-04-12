@@ -208,6 +208,12 @@ internal static class CliApplication
             AnsiConsole.MarkupLine($"Copied [aqua]{result.CopiedChannelOverrides}[/] @everyone channel/category overrides to MEMBER.");
             if (result.RemovedChannelOverrides > 0)
                 AnsiConsole.MarkupLine($"Removed [aqua]{result.RemovedChannelOverrides}[/] MEMBER overrides that no longer match @everyone.");
+            if (result.SkippedServerPermissions.Count > 0)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[yellow]Skipped @everyone permissions the bot cannot grant:[/] {Markup.Escape(string.Join(", ", result.SkippedServerPermissions))}");
+                AnsiConsole.MarkupLine("[grey]If you want those on MEMBER too, set them manually in Discord after the role is created.[/]");
+            }
 
             AnsiConsole.MarkupLine("[grey]This command needs Manage Roles and Manage Channels on the Discord server.[/]");
             return 0;
