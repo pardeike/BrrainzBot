@@ -1,5 +1,7 @@
 # BrrainzBot
 
+<img src="docs/assets/illustrations/fluffy-bot.png" alt="BrrainzBot robot" width="120" align="right">
+
 BrrainzBot is a Discord bot for two jobs:
 
 - let new people in without clutter
