@@ -60,6 +60,18 @@ This does **not** mean other people can run code on your machine.
 
 Open **OAuth2** → **URL Generator**.
 
+Shortcut:
+
+```bash
+./brrainzbot invite-url --client-id <appId> --open
+```
+
+If you already ran `setup`, this also works and will resolve the app ID from the saved bot token:
+
+```bash
+./brrainzbot invite-url --open
+```
+
 Under **Scopes**, select:
 
 - `bot`
@@ -76,7 +88,7 @@ Under **Bot Permissions**, select all seven required permissions:
 - `Manage Channels`
 - `Kick Members`
 
-Then copy the generated URL at the bottom.
+If you use the portal generator, copy the generated URL at the bottom.
 
 ## 7. Invite the Bot
 

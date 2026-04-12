@@ -16,6 +16,12 @@ If you do not have those yet, start with [Discord setup](discord-setup.md).
 
 Inviting the bot before you enable a server is safe. An installed server stays inactive until you turn it on.
 
+If you already saved the bot token, BrrainzBot can open the exact Discord invite URL for you:
+
+```bash
+./brrainzbot invite-url --open
+```
+
 ## 1. Download a Release
 
 Choose the archive that matches your machine:

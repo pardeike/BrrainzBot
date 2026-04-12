@@ -28,6 +28,7 @@ internal static class CliApplication
             "disable" => await EnableDisableAsync(paths, commandArgs, isActive: false),
             "set-members" => await SetMembersAsync(paths, commandArgs),
             "create-member" => await CreateMemberAsync(paths, commandArgs),
+            "invite-url" => await InviteUrlAsync(paths, commandArgs),
             "doctor" => await DoctorAsync(paths),
             "print-config" => await PrintConfigAsync(paths),
             "run" => await RunBotAsync(paths),
@@ -50,6 +51,7 @@ internal static class CliApplication
         AnsiConsole.MarkupLine("  [green]disable[/]       Turn one server off without rerunning setup.");
         AnsiConsole.MarkupLine("  [green]create-member[/] Create or sync a real MEMBER role from @everyone for one server.");
         AnsiConsole.MarkupLine("  [green]set-members[/]   Add MEMBER to existing users on one server.");
+        AnsiConsole.MarkupLine("  [green]invite-url[/]    Print the Discord bot invite URL and optionally open it.");
         AnsiConsole.MarkupLine("  [green]doctor[/]        Validate configuration, Discord IDs, and AI settings.");
         AnsiConsole.MarkupLine("  [green]print-config[/]  Show the current configuration with secrets redacted.");
         AnsiConsole.MarkupLine("  [green]run[/]           Start the bot.");
@@ -261,6 +263,52 @@ internal static class CliApplication
         }
     }
 
+    private static async Task<int> InviteUrlAsync(AppPaths paths, IReadOnlyList<string> args)
+    {
+        try
+        {
+            var options = ParseInviteUrlOptions(args);
+            var store = new BotConfigurationStore();
+            var settings = store.Exists(paths) ? await store.LoadSettingsAsync(paths, CancellationToken.None) : new BotSettings();
+            var secrets = File.Exists(paths.SecretsFilePath)
+                ? await store.LoadSecretsAsync(paths, CancellationToken.None)
+                : new RuntimeSecrets();
+
+            var services = new ServiceCollection()
+                .AddBrrainzBotInfrastructure(settings, secrets, paths)
+                .BuildServiceProvider();
+
+            var inviteService = services.GetRequiredService<DiscordInviteService>();
+            var result = await inviteService.CreateAsync(settings, options.ServerId, options.ClientId, CancellationToken.None);
+
+            AnsiConsole.MarkupLine($"Client ID: [aqua]{result.ClientId}[/]");
+            AnsiConsole.MarkupLine($"Permissions: [aqua]{DiscordInviteService.RequiredBotPermissions}[/]");
+            if (result.ServerId is > 0)
+                AnsiConsole.MarkupLine($"Server: [aqua]{result.ServerId}[/] [grey](preselected and locked)[/]");
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("[green]Invite URL[/]");
+            AnsiConsole.Write(new Panel(new Text(result.Url)).Expand());
+
+            if (!options.OpenBrowser)
+                return 0;
+
+            OpenInBrowser(result.Url);
+            AnsiConsole.MarkupLine("[green]Opened the invite URL in your default browser.[/]");
+            return 0;
+        }
+        catch (InvalidOperationException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]invite-url failed:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+    }
+
     private static async Task<int> PrintConfigAsync(AppPaths paths)
     {
         var store = new BotConfigurationStore();
@@ -393,6 +441,47 @@ internal static class CliApplication
         throw new InvalidOperationException($"Usage: brrainzbot {commandName} <serverId>");
     }
 
+    private static InviteUrlOptions ParseInviteUrlOptions(IReadOnlyList<string> args)
+    {
+        ulong? serverId = null;
+        ulong? clientId = null;
+        var openBrowser = false;
+
+        for (var i = 0; i < args.Count; i++)
+        {
+            switch (args[i])
+            {
+                case "--open":
+                    openBrowser = true;
+                    break;
+                case "--client-id":
+                    if (i + 1 >= args.Count || !ulong.TryParse(args[++i], out var parsedClientId))
+                        throw new InvalidOperationException("Usage: brrainzbot invite-url [<serverId>] [--client-id <appId>] [--open]");
+                    clientId = parsedClientId;
+                    break;
+                default:
+                    if (ulong.TryParse(args[i], out var parsedServerId) && serverId == null)
+                    {
+                        serverId = parsedServerId;
+                        break;
+                    }
+
+                    throw new InvalidOperationException("Usage: brrainzbot invite-url [<serverId>] [--client-id <appId>] [--open]");
+            }
+        }
+
+        return new InviteUrlOptions(serverId, clientId, openBrowser);
+    }
+
+    private static void OpenInBrowser(string url)
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = url,
+            UseShellExecute = true
+        });
+    }
+
     private static AppPaths ResolvePaths(string[] args)
     {
         for (var i = 0; i < args.Length - 1; i++)
@@ -492,4 +581,6 @@ internal static class CliApplication
             SpamGuard = server.SpamGuard
         });
     }
+
+    private sealed record InviteUrlOptions(ulong? ServerId, ulong? ClientId, bool OpenBrowser);
 }
