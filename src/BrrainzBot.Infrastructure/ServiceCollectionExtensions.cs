@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(paths);
         services.AddSingleton<BotConfigurationStore>();
         services.AddSingleton<BotDoctor>();
+        services.AddSingleton<ServerAdministrationService>();
         services.AddSingleton<ReloadingBotSettingsProvider>();
         services.AddSingleton<IBotSettingsProvider>(provider => provider.GetRequiredService<ReloadingBotSettingsProvider>());
         services.AddSingleton<IAuditLog, JsonAuditLog>();

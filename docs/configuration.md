@@ -61,6 +61,13 @@ Simpler but weaker:
 
 The simpler model is fine for small low-risk servers. The real `MEMBER` role is safer.
 
+If you start with the simpler model and later want to migrate, use:
+
+```bash
+./brrainzbot create-member <serverId>
+./brrainzbot set-members <serverId>
+```
+
 ## Good Prompting for the Onboarding AI
 
 Your server topic prompt should say:

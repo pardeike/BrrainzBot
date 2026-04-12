@@ -28,6 +28,24 @@ If you only manage one server, these also work:
 ./brrainzbot disable
 ```
 
+## Prepare a Real `MEMBER` Role
+
+If your server currently uses `@everyone` as the normal member state, you can migrate in two steps:
+
+```bash
+./brrainzbot create-member <serverId>
+./brrainzbot set-members <serverId>
+```
+
+What they do:
+
+- `create-member` creates or fixes a real `MEMBER` role and copies the current `@everyone` channel/category overrides to it
+- `set-members` gives that `MEMBER` role to existing non-bot users who are not still in `NEW`
+
+Run `create-member` first. Then run `set-members`. Only after that should you remove normal member permissions from `@everyone`.
+
+`create-member` needs both `Manage Roles` and `Manage Channels` on the Discord server.
+
 ## Revalidate After Changes
 
 Any time you change:
@@ -107,3 +125,14 @@ Simpler model:
 
 - `@everyone` is the member state
 - `NEW` explicitly denies posting until approval
+
+### I want to move from `@everyone` to a real `MEMBER` role
+
+Use:
+
+```bash
+./brrainzbot create-member <serverId>
+./brrainzbot set-members <serverId>
+```
+
+Then move normal member permissions from `@everyone` to `MEMBER`.

@@ -26,6 +26,8 @@ internal static class CliApplication
             "status" => await StatusAsync(paths, commandArgs),
             "enable" => await EnableDisableAsync(paths, commandArgs, isActive: true),
             "disable" => await EnableDisableAsync(paths, commandArgs, isActive: false),
+            "set-members" => await SetMembersAsync(paths, commandArgs),
+            "create-member" => await CreateMemberAsync(paths, commandArgs),
             "doctor" => await DoctorAsync(paths),
             "print-config" => await PrintConfigAsync(paths),
             "run" => await RunBotAsync(paths),
@@ -46,6 +48,8 @@ internal static class CliApplication
         AnsiConsole.MarkupLine("  [green]status[/]        Show per-server activation and feature state.");
         AnsiConsole.MarkupLine("  [green]enable[/]        Turn one server on without rerunning setup.");
         AnsiConsole.MarkupLine("  [green]disable[/]       Turn one server off without rerunning setup.");
+        AnsiConsole.MarkupLine("  [green]create-member[/] Create or sync a real MEMBER role from @everyone for one server.");
+        AnsiConsole.MarkupLine("  [green]set-members[/]   Add MEMBER to existing users on one server.");
         AnsiConsole.MarkupLine("  [green]doctor[/]        Validate configuration, Discord IDs, and AI settings.");
         AnsiConsole.MarkupLine("  [green]print-config[/]  Show the current configuration with secrets redacted.");
         AnsiConsole.MarkupLine("  [green]run[/]           Start the bot.");
@@ -169,6 +173,94 @@ internal static class CliApplication
         return 0;
     }
 
+    private static async Task<int> CreateMemberAsync(AppPaths paths, IReadOnlyList<string> args)
+    {
+        var (settings, secrets) = await LoadRequiredConfigurationAsync(paths);
+
+        try
+        {
+            var serverId = ParseOptionalServerId(args, "create-member");
+            var services = new ServiceCollection()
+                .AddBrrainzBotInfrastructure(settings, secrets, paths)
+                .BuildServiceProvider();
+
+            var admin = services.GetRequiredService<ServerAdministrationService>();
+            var result = await admin.CreateMemberRoleAsync(settings, serverId, CancellationToken.None);
+
+            if (result.UpdatedConfig)
+            {
+                var store = services.GetRequiredService<BotConfigurationStore>();
+                var updatedSettings = ReplaceServerMemberRole(settings, result.ServerId, result.MemberRoleId);
+                await store.SaveSettingsAsync(paths, updatedSettings, CancellationToken.None);
+            }
+
+            AnsiConsole.MarkupLine($"[green]{Markup.Escape(result.ServerName)}[/]: MEMBER is ready at role ID [aqua]{result.MemberRoleId}[/].");
+            if (result.CreatedRole)
+                AnsiConsole.MarkupLine("A new MEMBER role was created.");
+            else
+                AnsiConsole.MarkupLine("The existing MEMBER role was synchronized.");
+
+            if (result.UpdatedConfig)
+                AnsiConsole.MarkupLine("`config.json` was updated to use that role.");
+
+            AnsiConsole.MarkupLine($"Copied [aqua]{result.CopiedChannelOverrides}[/] @everyone channel/category overrides to MEMBER.");
+            if (result.RemovedChannelOverrides > 0)
+                AnsiConsole.MarkupLine($"Removed [aqua]{result.RemovedChannelOverrides}[/] MEMBER overrides that no longer match @everyone.");
+
+            AnsiConsole.MarkupLine("[grey]This command needs Manage Roles and Manage Channels on the Discord server.[/]");
+            return 0;
+        }
+        catch (InvalidOperationException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]create-member failed:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+    }
+
+    private static async Task<int> SetMembersAsync(AppPaths paths, IReadOnlyList<string> args)
+    {
+        var (settings, secrets) = await LoadRequiredConfigurationAsync(paths);
+
+        try
+        {
+            var serverId = ParseOptionalServerId(args, "set-members");
+            var services = new ServiceCollection()
+                .AddBrrainzBotInfrastructure(settings, secrets, paths)
+                .BuildServiceProvider();
+
+            var admin = services.GetRequiredService<ServerAdministrationService>();
+            AnsiConsole.MarkupLine("[grey]Downloading members and assigning MEMBER where needed. This can take a while on large servers.[/]");
+            var result = await admin.SetMembersAsync(settings, serverId, CancellationToken.None);
+
+            var table = new Table().AddColumns("Server", "Checked", "Added", "Already had MEMBER", "Skipped NEW", "Skipped bots", "Failed");
+            table.AddRow(
+                Markup.Escape(result.ServerName),
+                result.CheckedMembers.ToString(),
+                result.Added.ToString(),
+                result.AlreadyHadMember.ToString(),
+                result.NewUsersSkipped.ToString(),
+                result.BotsSkipped.ToString(),
+                result.Failed.ToString());
+            AnsiConsole.Write(table);
+            return result.Failed == 0 ? 0 : 1;
+        }
+        catch (InvalidOperationException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]set-members failed:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+    }
+
     private static async Task<int> PrintConfigAsync(AppPaths paths)
     {
         var store = new BotConfigurationStore();
@@ -290,6 +382,17 @@ internal static class CliApplication
         return await store.LoadAsync(paths, CancellationToken.None);
     }
 
+    private static ulong? ParseOptionalServerId(IReadOnlyList<string> args, string commandName)
+    {
+        if (args.Count == 0)
+            return null;
+
+        if (args.Count == 1 && ulong.TryParse(args[0], out var serverId))
+            return serverId;
+
+        throw new InvalidOperationException($"Usage: brrainzbot {commandName} <serverId>");
+    }
+
     private static AppPaths ResolvePaths(string[] args)
     {
         for (var i = 0; i < args.Length - 1; i++)
@@ -366,4 +469,27 @@ internal static class CliApplication
         Ai = settings.Ai,
         Servers = [.. settings.Servers.Select(s => s.ServerId == serverId ? replacement : s)]
     };
+
+    private static BotSettings ReplaceServerMemberRole(BotSettings settings, ulong serverId, ulong memberRoleId)
+    {
+        var server = settings.FindServer(serverId)
+            ?? throw new InvalidOperationException($"Server {serverId} is not in the current config.");
+
+        return ReplaceServer(settings, serverId, new ServerSettings
+        {
+            Name = server.Name,
+            ServerId = server.ServerId,
+            IsActive = server.IsActive,
+            WelcomeChannelId = server.WelcomeChannelId,
+            NewRoleId = server.NewRoleId,
+            MemberRoleId = memberRoleId,
+            OwnerUserId = server.OwnerUserId,
+            EnableOnboarding = server.EnableOnboarding,
+            EnableSpamGuard = server.EnableSpamGuard,
+            ServerTopicPrompt = server.ServerTopicPrompt,
+            PublicReadOnlyChannelIds = [.. server.PublicReadOnlyChannelIds],
+            Onboarding = server.Onboarding,
+            SpamGuard = server.SpamGuard
+        });
+    }
 }

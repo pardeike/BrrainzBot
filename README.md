@@ -42,6 +42,8 @@ brrainzbot doctor
 brrainzbot status
 brrainzbot enable <serverId>
 brrainzbot disable <serverId>
+brrainzbot create-member <serverId>
+brrainzbot set-members <serverId>
 brrainzbot run
 brrainzbot print-config
 brrainzbot self-update

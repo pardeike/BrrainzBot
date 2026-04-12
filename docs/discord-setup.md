@@ -110,6 +110,13 @@ Simpler but weaker model:
 
 If you choose the simpler model, enter the **server ID** as the member role ID during setup.
 
+If you later want to migrate to a real `MEMBER` role, BrrainzBot can help:
+
+```bash
+./brrainzbot create-member <serverId>
+./brrainzbot set-members <serverId>
+```
+
 ## 9. Create `#welcome`
 
 Create a channel called `#welcome`.
