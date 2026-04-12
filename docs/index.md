@@ -8,7 +8,7 @@ hide:
 <section class="hero-shell">
   <div class="hero-grid">
     <div class="hero-copy reveal">
-      <div class="hero-kicker"><span></span>Self-hosted. Clear. Quiet.</div>
+      <div class="hero-kicker"><span></span>Self-hosted • Clear • Quiet</div>
       <h1 class="hero-anchor">
         <span class="hero-line">Let people in.</span>
         <span class="hero-line">Keep spam out.</span>
@@ -51,7 +51,7 @@ hide:
 <section class="bb-section reveal">
   <div class="section-heading">
     <span class="eyebrow">What it does</span>
-    <h2>One bot. Two jobs.</h2>
+    <h2>One bot. Multiple jobs.</h2>
     <p>
       It handles entry and cleanup. New users verify in <code>#welcome</code>. SpamGuard removes honeypot and duplicate spam.
     </p>

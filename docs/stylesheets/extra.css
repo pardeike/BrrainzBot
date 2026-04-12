@@ -23,13 +23,7 @@ body {
   font-family: "Montserrat", sans-serif;
   font-weight: 200;
   color: var(--bb-ink);
-  background:
-    radial-gradient(circle at top left, rgba(47, 111, 228, 0.08), transparent 30%),
-    radial-gradient(circle at 95% 10%, rgba(54, 193, 167, 0.12), transparent 22%),
-    linear-gradient(180deg, #ffffff 0%, #ffffff 55%, #fbfcff 100%);
-  background-repeat: no-repeat, no-repeat, no-repeat;
-  background-position: left top, right top, left top;
-  background-size: 34rem 34rem, 28rem 28rem, 100% 42rem;
+  background: #ffffff;
 }
 
 .md-typeset h1,
@@ -78,34 +72,39 @@ body {
 
 .hero-shell {
   position: relative;
-  overflow: hidden;
+  isolation: isolate;
   margin: -0.25rem 0 4rem;
-  padding: 2rem 0 0;
+  padding: 2.3rem 0 1.25rem;
 }
 
 .hero-shell::before,
 .hero-shell::after {
   content: "";
   position: absolute;
-  border-radius: 999px;
-  filter: blur(24px);
   pointer-events: none;
 }
 
 .hero-shell::before {
-  top: 4rem;
-  right: -4rem;
-  width: 14rem;
-  height: 14rem;
-  background: rgba(54, 193, 167, 0.18);
+  z-index: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  top: -2.7rem;
+  bottom: -4.2rem;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(47, 111, 228, 0.1), rgba(47, 111, 228, 0) 24rem),
+    radial-gradient(circle at 88% 12%, rgba(54, 193, 167, 0.18), rgba(54, 193, 167, 0) 22rem),
+    linear-gradient(180deg, rgba(244, 248, 255, 0.96) 0%, rgba(250, 252, 255, 0.82) 46%, rgba(255, 255, 255, 0.1) 82%, rgba(255, 255, 255, 0) 100%);
 }
 
 .hero-shell::after {
-  left: -5rem;
-  top: 10rem;
+  z-index: 0;
+  top: 6rem;
+  right: -4rem;
   width: 15rem;
   height: 15rem;
-  background: rgba(47, 111, 228, 0.12);
+  border-radius: 999px;
+  background: rgba(54, 193, 167, 0.14);
+  filter: blur(30px);
 }
 
 .hero-grid {
@@ -476,10 +475,6 @@ body {
 }
 
 @media screen and (max-width: 76.1875em) {
-  body {
-    background-size: 28rem 28rem, 22rem 22rem, 100% 34rem;
-  }
-
   .story-grid,
   .split-grid,
   .feature-grid,
@@ -500,10 +495,6 @@ body {
 }
 
 @media screen and (max-width: 44em) {
-  body {
-    background-size: 22rem 22rem, 16rem 16rem, 100% 28rem;
-  }
-
   .hero-card.hero-card-bot {
     min-height: 24rem;
     padding: 1.25rem;
