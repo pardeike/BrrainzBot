@@ -129,14 +129,6 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 
         var serverJson = await serverResponse.Content.ReadAsStringAsync(cancellationToken);
         using var serverDocument = JsonDocument.Parse(serverJson);
-        if (serverDocument.RootElement.TryGetProperty("mfa_level", out var mfaLevelElement)
-            && mfaLevelElement.GetInt32() > 0)
-        {
-            report.AddWarning(
-                "discord.server_2fa.enabled",
-                $"{server.Name}: this server has server-wide 2FA enabled. Elevated bot permissions like Manage Roles, Manage Channels, Manage Messages, and Kick Members only work if the bot owner account has 2FA enabled.");
-        }
-
         var channels = await LoadChannelsAsync(client, server, report, cancellationToken);
         var roles = await LoadRolesAsync(client, server, report, cancellationToken);
 
