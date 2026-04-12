@@ -367,7 +367,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
     private static bool Denies(PermissionOverwriteSnapshot? overwrite, ChannelPermission permission) =>
         overwrite != null && (overwrite.Deny & PermissionBit(permission)) != 0;
 
-    private static ulong PermissionBit(ChannelPermission permission) => 1UL << (int)permission;
+    private static ulong PermissionBit(ChannelPermission permission) => (ulong)permission;
 
     private static IReadOnlyList<string> DescribeGuildPermissions(ulong rawPermissions) => Enum
         .GetValues<GuildPermission>()
