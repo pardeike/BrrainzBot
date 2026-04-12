@@ -12,3 +12,5 @@ site/
 *.snupkg
 *.log
 .env
+.playwright-cli/
+output/
