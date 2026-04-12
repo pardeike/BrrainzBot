@@ -1,11 +1,11 @@
 # BrrainzBot
 
-BrrainzBot is a friendly Discord bot for two jobs that usually get bolted together badly:
+BrrainzBot is a Discord bot for two jobs:
 
-- welcoming new people without littering the server
-- keeping spam under control without making server setup miserable
+- let new people in without clutter
+- keep common spam out without painful setup
 
-It is built for self-hosters who want a polished command-line experience, clear documentation, and a Discord flow that feels human instead of robotic.
+It is built for self-hosters who want clear setup, clear docs, and predictable behavior.
 
 ## What It Does
 
@@ -34,7 +34,7 @@ Most Discord bot projects assume you already know:
 - which roles should grant read access versus write access
 - how to wire an OpenAI-compatible endpoint safely
 
-BrrainzBot treats that as a product problem, not a user problem.
+BrrainzBot treats that as part of the product.
 
 ## Quick Start
 
@@ -65,11 +65,11 @@ brrainzbot self-update
 
 ## Design Principles
 
-- Friendly outside, serious inside.
-- Simple enough for first-time installers.
-- Clear enough for professionals who want to move fast.
-- Local-first and transparent.
-- Manual self-update only. No background version polling.
+- Clear words.
+- Good defaults.
+- Local state.
+- Manual updates.
+- No hidden checks in the background.
 
 ## Development
 

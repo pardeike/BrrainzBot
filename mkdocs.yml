@@ -1,5 +1,5 @@
 site_name: BrrainzBot
-site_description: Friendly Discord onboarding, human verification, and spam defense for self-hosted communities
+site_description: Self-hosted Discord onboarding and spam defense
 site_url: https://pardeike.github.io/BrrainzBot/
 repo_url: https://github.com/pardeike/BrrainzBot
 repo_name: pardeike/BrrainzBot
