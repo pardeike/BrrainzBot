@@ -22,7 +22,7 @@ If you only manage one server, `brrainzbot enable` and `brrainzbot disable` also
 If you want the exact Discord invite link without using the portal generator:
 
 ```bash
-brrainzbot invite-url --open
+brrainzbot invite-url
 ```
 
 ## What It Does
@@ -48,7 +48,7 @@ brrainzbot doctor
 brrainzbot status
 brrainzbot enable <serverId>
 brrainzbot disable <serverId>
-brrainzbot invite-url [<serverId>] [--open]
+brrainzbot invite-url [<serverId>]
 brrainzbot create-member <serverId>
 brrainzbot set-members <serverId>
 brrainzbot run

@@ -19,7 +19,7 @@ Inviting the bot before you enable a server is safe. An installed server stays i
 If you already saved the bot token, BrrainzBot can open the exact Discord invite URL for you:
 
 ```bash
-./brrainzbot invite-url --open
+./brrainzbot invite-url
 ```
 
 ## 1. Download a Release

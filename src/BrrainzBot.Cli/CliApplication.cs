@@ -51,7 +51,7 @@ internal static class CliApplication
         AnsiConsole.MarkupLine("  [green]disable[/]       Turn one server off without rerunning setup.");
         AnsiConsole.MarkupLine("  [green]create-member[/] Create or sync a real MEMBER role from @everyone for one server.");
         AnsiConsole.MarkupLine("  [green]set-members[/]   Add MEMBER to existing users on one server.");
-        AnsiConsole.MarkupLine("  [green]invite-url[/]    Print the Discord bot invite URL and optionally open it.");
+        AnsiConsole.MarkupLine("  [green]invite-url[/]    Print the Discord bot invite URL and open it in the default browser.");
         AnsiConsole.MarkupLine("  [green]doctor[/]        Validate configuration, Discord IDs, and AI settings.");
         AnsiConsole.MarkupLine("  [green]print-config[/]  Show the current configuration with secrets redacted.");
         AnsiConsole.MarkupLine("  [green]run[/]           Start the bot.");
@@ -283,18 +283,14 @@ internal static class CliApplication
 
             AnsiConsole.MarkupLine($"Client ID: [aqua]{result.ClientId}[/]");
             AnsiConsole.MarkupLine($"Permissions: [aqua]{DiscordInviteService.RequiredBotPermissions}[/]");
-            if (result.ServerId is > 0)
-                AnsiConsole.MarkupLine($"Server: [aqua]{result.ServerId}[/] [grey](preselected and locked)[/]");
+            AnsiConsole.MarkupLine($"Invite URL: [grey]{Markup.Escape(result.Url)}[/]");
 
-            AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("[green]Invite URL[/]");
-            AnsiConsole.Write(new Panel(new Text(result.Url)).Expand());
+            if (options.OpenBrowser)
+            {
+                OpenInBrowser(result.Url);
+                AnsiConsole.MarkupLine("[green]Opened the invite URL in your default browser.[/]");
+            }
 
-            if (!options.OpenBrowser)
-                return 0;
-
-            OpenInBrowser(result.Url);
-            AnsiConsole.MarkupLine("[green]Opened the invite URL in your default browser.[/]");
             return 0;
         }
         catch (InvalidOperationException ex)
@@ -445,7 +441,7 @@ internal static class CliApplication
     {
         ulong? serverId = null;
         ulong? clientId = null;
-        var openBrowser = false;
+        var openBrowser = true;
 
         for (var i = 0; i < args.Count; i++)
         {
@@ -454,9 +450,12 @@ internal static class CliApplication
                 case "--open":
                     openBrowser = true;
                     break;
+                case "--no-open":
+                    openBrowser = false;
+                    break;
                 case "--client-id":
                     if (i + 1 >= args.Count || !ulong.TryParse(args[++i], out var parsedClientId))
-                        throw new InvalidOperationException("Usage: brrainzbot invite-url [<serverId>] [--client-id <appId>] [--open]");
+                        throw new InvalidOperationException("Usage: brrainzbot invite-url [<serverId>] [--client-id <appId>] [--no-open]");
                     clientId = parsedClientId;
                     break;
                 default:
@@ -466,7 +465,7 @@ internal static class CliApplication
                         break;
                     }
 
-                    throw new InvalidOperationException("Usage: brrainzbot invite-url [<serverId>] [--client-id <appId>] [--open]");
+                    throw new InvalidOperationException("Usage: brrainzbot invite-url [<serverId>] [--client-id <appId>] [--no-open]");
             }
         }
 

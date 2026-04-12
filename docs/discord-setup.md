@@ -63,13 +63,13 @@ Open **OAuth2** → **URL Generator**.
 Shortcut:
 
 ```bash
-./brrainzbot invite-url --client-id <appId> --open
+./brrainzbot invite-url --client-id <appId>
 ```
 
 If you already ran `setup`, this also works and will resolve the app ID from the saved bot token:
 
 ```bash
-./brrainzbot invite-url --open
+./brrainzbot invite-url
 ```
 
 Under **Scopes**, select:
