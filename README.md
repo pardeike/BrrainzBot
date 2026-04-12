@@ -44,7 +44,8 @@ BrrainzBot treats that as part of the product.
 2. Run `brrainzbot setup`.
 3. Follow the prompts.
 4. Run `brrainzbot doctor`.
-5. Run `brrainzbot run`.
+5. Turn the bot on in `brrainzbot setup` when you are ready.
+6. Run `brrainzbot run`.
 
 If you are starting from zero, use the full docs:
 
@@ -70,6 +71,7 @@ brrainzbot self-update
 - Good defaults.
 - Local state.
 - Manual updates.
+- Off by default.
 - No hidden checks in the background.
 
 ## Development

@@ -146,6 +146,10 @@ internal static class CliApplication
             .Build();
 
         AnsiConsole.MarkupLine($"[green]Starting {Markup.Escape(settings.FriendlyName)} {Markup.Escape(BotMetadata.Version)}[/]");
+        if (!settings.Enabled)
+        {
+            AnsiConsole.MarkupLine("[yellow]The bot is disabled in config. It will stay idle and will not connect to Discord until you enable it in setup.[/]");
+        }
         await host.RunAsync();
         return 0;
     }

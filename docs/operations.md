@@ -6,6 +6,8 @@
 ./brrainzbot run
 ```
 
+If the bot is disabled in config, this starts an idle process that does not connect to Discord.
+
 ## Revalidate After Changes
 
 Any time you change roles, channels, or tokens:

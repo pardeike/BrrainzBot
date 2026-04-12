@@ -39,6 +39,38 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
+    public async Task DoctorExplainsWhenBotIsDisabled()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory());
+        var settings = new BotSettings
+        {
+            Enabled = false,
+            Guilds =
+            [
+                new GuildSettings
+                {
+                    Name = "Test Guild",
+                    GuildId = 123,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 1000,
+                    OwnerUserId = 999,
+                    SpamGuard = new SpamGuardSettings
+                    {
+                        HoneypotChannelId = 654
+                    }
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets();
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, message => message.Code == "bot.disabled");
+    }
+
+    [Fact]
     public async Task DoctorExplainsLikelyCauseWhenGuildCannotBeReached()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory(request =>

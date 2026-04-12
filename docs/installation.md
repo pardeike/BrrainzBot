@@ -19,6 +19,7 @@ Extract the archive somewhere stable. Do not place it inside a temporary downloa
 
 The wizard asks for:
 
+- whether the bot should be enabled now
 - your Discord bot token
 - your OpenAI-compatible endpoint URL
 - your AI model name
@@ -30,6 +31,11 @@ It stores:
 - normal config in `config.json`
 - secrets in `secrets.json`
 - session state and logs in the same application directory tree
+
+Safe default:
+
+- the bot starts out disabled unless you explicitly turn it on
+- `doctor` can validate everything before the bot touches your servers
 
 ## 3. Validate Before Going Live
 
@@ -50,6 +56,8 @@ Use this every time you change:
 ```bash
 ./brrainzbot run
 ```
+
+If the bot is still disabled, `run` stays idle and does not connect to Discord. Rerun `setup` when you want to turn it on.
 
 ## 5. Change an Existing Install
 

@@ -9,6 +9,7 @@ The setup wizard writes both files for you.
 
 ## What Lives in `config.json`
 
+- whether the bot is enabled
 - installation name
 - GitHub repository used for self-update
 - AI endpoint base URL and model
@@ -57,6 +58,7 @@ Keep it short and concrete. One strong paragraph is usually enough.
 
 ## Safe Defaults
 
+- bot disabled until you turn it on
 - `3` attempts
 - `10 minute` cooldown
 - `24 hour` stale timeout

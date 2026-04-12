@@ -53,6 +53,11 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         if (settings.Guilds.Count == 0)
             report.AddError("guilds.empty", "At least one guild must be configured.");
 
+        if (!settings.Enabled)
+        {
+            report.AddInfo("bot.disabled", "The bot is currently disabled in config. `run` will stay idle until you enable it in setup.");
+        }
+
         foreach (var guild in settings.Guilds)
         {
             if (guild.GuildId == 0)

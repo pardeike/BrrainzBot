@@ -5,6 +5,7 @@ namespace BrrainzBot.Host;
 public sealed class BotSettings
 {
     public string FriendlyName { get; init; } = "BrrainzBot";
+    public bool Enabled { get; init; }
     public string? GitHubRepository { get; init; } = "ap/BrrainzBot";
     public UpdateSettings Updates { get; init; } = new();
     public AiProviderSettings Ai { get; init; } = new();
