@@ -6,7 +6,15 @@
 ./brrainzbot run
 ```
 
-If the bot is disabled in config, this starts an idle process that does not connect to Discord.
+The bot reads the current config and keeps honoring per-guild on/off changes while it is running.
+
+## See or Change Guild Status
+
+```bash
+./brrainzbot status
+./brrainzbot status on <guildId>
+./brrainzbot status off <guildId>
+```
 
 ## Revalidate After Changes
 

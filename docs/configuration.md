@@ -9,7 +9,6 @@ The setup wizard writes both files for you.
 
 ## What Lives in `config.json`
 
-- whether the bot is enabled
 - installation name
 - GitHub repository used for self-update
 - AI endpoint base URL and model
@@ -27,6 +26,7 @@ The setup wizard writes both files for you.
 ```bash
 ./brrainzbot print-config
 ./brrainzbot setup
+./brrainzbot status
 ./brrainzbot doctor
 ```
 
@@ -35,6 +35,7 @@ The setup wizard writes both files for you.
 Each guild has its own:
 
 - guild ID
+- active on/off state
 - welcome channel ID
 - spam honeypot channel ID when SpamGuard is enabled
 - `NEW` role ID
@@ -58,7 +59,7 @@ Keep it short and concrete. One strong paragraph is usually enough.
 
 ## Safe Defaults
 
-- bot disabled until you turn it on
+- guilds off until you turn them on
 - `3` attempts
 - `10 minute` cooldown
 - `24 hour` stale timeout

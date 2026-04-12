@@ -9,20 +9,11 @@ namespace BrrainzBot.Infrastructure;
 public sealed class DiscordGatewayHostedService(
     DiscordSocketClient client,
     IEnumerable<IDiscordModule> modules,
-    BotSettings settings,
     RuntimeSecrets secrets,
     ILogger<DiscordGatewayHostedService> logger) : IHostedService
 {
-    private bool _gatewayStarted;
-
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!settings.Enabled)
-        {
-            logger.LogInformation("BrrainzBot is disabled in config. The process will stay idle and will not connect to Discord.");
-            return;
-        }
-
         client.Log += OnLogAsync;
         foreach (var module in modules)
         {
@@ -32,14 +23,10 @@ public sealed class DiscordGatewayHostedService(
 
         await client.LoginAsync(TokenType.Bot, secrets.DiscordToken);
         await client.StartAsync();
-        _gatewayStarted = true;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        if (!_gatewayStarted)
-            return;
-
         await client.StopAsync();
         await client.LogoutAsync();
     }

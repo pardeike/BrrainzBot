@@ -17,16 +17,18 @@ internal static class CliApplication
         var command = args.FirstOrDefault()?.ToLowerInvariant() ?? "help";
         var remaining = args.Skip(1).ToArray();
         var paths = ResolvePaths(remaining);
+        var commandArgs = StripRootArguments(remaining);
 
         return command switch
         {
             "help" or "--help" or "-h" => ShowHelp(),
             "setup" => await SetupAsync(paths),
+            "status" => await StatusAsync(paths, commandArgs),
             "doctor" => await DoctorAsync(paths),
             "print-config" => await PrintConfigAsync(paths),
             "run" => await RunBotAsync(paths),
             "self-update" => await SelfUpdateAsync(paths),
-            "__internal-apply-update" => await ApplyUpdateAsync(remaining),
+            "__internal-apply-update" => await ApplyUpdateAsync(commandArgs),
             _ => ShowUnknownCommand(command)
         };
     }
@@ -39,6 +41,7 @@ internal static class CliApplication
         AnsiConsole.MarkupLine("Usage: [aqua]brrainzbot[/] <command> [grey][[--root path]][/]");
         AnsiConsole.MarkupLine("Commands:");
         AnsiConsole.MarkupLine("  [green]setup[/]         Create or update the configuration with a guided wizard.");
+        AnsiConsole.MarkupLine("  [green]status[/]        Show per-guild activation, or switch one guild on or off.");
         AnsiConsole.MarkupLine("  [green]doctor[/]        Validate configuration, Discord IDs, and AI settings.");
         AnsiConsole.MarkupLine("  [green]print-config[/]  Show the current configuration with secrets redacted.");
         AnsiConsole.MarkupLine("  [green]run[/]           Start the bot.");
@@ -67,7 +70,73 @@ internal static class CliApplication
         AnsiConsole.MarkupLine($"[green]Saved secrets to[/] {Markup.Escape(paths.SecretsFilePath)}");
         AnsiConsole.MarkupLine("Next steps:");
         AnsiConsole.MarkupLine("  1. Run [aqua]brrainzbot doctor[/] to validate the setup.");
-        AnsiConsole.MarkupLine("  2. Run [aqua]brrainzbot run[/] when you are ready.");
+        AnsiConsole.MarkupLine("  2. Use [aqua]brrainzbot status[/] to confirm which guilds are active.");
+        AnsiConsole.MarkupLine("  3. Run [aqua]brrainzbot run[/] when you are ready.");
+        return 0;
+    }
+
+    private static async Task<int> StatusAsync(AppPaths paths, IReadOnlyList<string> args)
+    {
+        var store = new BotConfigurationStore();
+        var settings = await store.LoadSettingsAsync(paths, CancellationToken.None);
+
+        if (args.Count == 0)
+            return ShowStatus(settings);
+
+        if (args.Count != 2 || (args[0] != "on" && args[0] != "off") || !ulong.TryParse(args[1], out var guildId))
+        {
+            AnsiConsole.MarkupLine("[red]Usage:[/] [aqua]brrainzbot status[/], [aqua]brrainzbot status on <guildId>[/], [aqua]brrainzbot status off <guildId>[/]");
+            return 1;
+        }
+
+        var guild = settings.FindGuild(guildId);
+        if (guild == null)
+        {
+            AnsiConsole.MarkupLine($"[red]Guild {guildId} is not in the current config.[/]");
+            return 1;
+        }
+
+        var updatedSettings = ReplaceGuild(
+            settings,
+            guildId,
+            new GuildSettings
+            {
+                Name = guild.Name,
+                GuildId = guild.GuildId,
+                IsActive = args[0] == "on",
+                WelcomeChannelId = guild.WelcomeChannelId,
+                NewRoleId = guild.NewRoleId,
+                MemberRoleId = guild.MemberRoleId,
+                OwnerUserId = guild.OwnerUserId,
+                EnableOnboarding = guild.EnableOnboarding,
+                EnableSpamGuard = guild.EnableSpamGuard,
+                GuildTopicPrompt = guild.GuildTopicPrompt,
+                PublicReadOnlyChannelIds = [.. guild.PublicReadOnlyChannelIds],
+                Onboarding = guild.Onboarding,
+                SpamGuard = guild.SpamGuard
+            });
+        await store.SaveSettingsAsync(paths, updatedSettings, CancellationToken.None);
+
+        AnsiConsole.MarkupLine(
+            $"[green]{Markup.Escape(guild.Name)}[/] is now {(args[0] == "on" ? "[green]on[/]" : "[yellow]off[/]")}.");
+        AnsiConsole.MarkupLine("A running bot process will pick this up automatically within a few seconds.");
+        return 0;
+    }
+
+    private static int ShowStatus(BotSettings settings)
+    {
+        var table = new Table().AddColumns("Guild", "Guild ID", "Active", "Onboarding", "SpamGuard");
+        foreach (var guild in settings.Guilds.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            table.AddRow(
+                Markup.Escape(guild.Name),
+                guild.GuildId.ToString(),
+                guild.IsActive ? "[green]on[/]" : "[yellow]off[/]",
+                guild.EnableOnboarding ? "[green]on[/]" : "[grey]off[/]",
+                guild.EnableSpamGuard ? "[green]on[/]" : "[grey]off[/]");
+        }
+
+        AnsiConsole.Write(table);
         return 0;
     }
 
@@ -146,10 +215,6 @@ internal static class CliApplication
             .Build();
 
         AnsiConsole.MarkupLine($"[green]Starting {Markup.Escape(settings.FriendlyName)} {Markup.Escape(BotMetadata.Version)}[/]");
-        if (!settings.Enabled)
-        {
-            AnsiConsole.MarkupLine("[yellow]The bot is disabled in config. It will stay idle and will not connect to Discord until you enable it in setup.[/]");
-        }
         await host.RunAsync();
         return 0;
     }
@@ -239,4 +304,30 @@ internal static class CliApplication
 
         return AppPaths.CreateDefault();
     }
+
+    private static string[] StripRootArguments(string[] args)
+    {
+        var filtered = new List<string>(args.Length);
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (string.Equals(args[i], "--root", StringComparison.Ordinal))
+            {
+                i++;
+                continue;
+            }
+
+            filtered.Add(args[i]);
+        }
+
+        return [.. filtered];
+    }
+
+    private static BotSettings ReplaceGuild(BotSettings settings, ulong guildId, GuildSettings replacement) => new()
+    {
+        FriendlyName = settings.FriendlyName,
+        GitHubRepository = settings.GitHubRepository,
+        Updates = settings.Updates,
+        Ai = settings.Ai,
+        Guilds = [.. settings.Guilds.Select(g => g.GuildId == guildId ? replacement : g)]
+    };
 }

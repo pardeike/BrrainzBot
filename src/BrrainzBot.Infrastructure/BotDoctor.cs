@@ -53,13 +53,12 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         if (settings.Guilds.Count == 0)
             report.AddError("guilds.empty", "At least one guild must be configured.");
 
-        if (!settings.Enabled)
-        {
-            report.AddInfo("bot.disabled", "The bot is currently disabled in config. `run` will stay idle until you enable it in setup.");
-        }
-
         foreach (var guild in settings.Guilds)
         {
+            if (!guild.IsActive)
+            {
+                report.AddInfo("guild.inactive", $"{guild.Name}: this guild is currently off. Use `brrainzbot status on {guild.GuildId}` when you are ready.");
+            }
             if (guild.GuildId == 0)
                 report.AddError("guild.id.zero", $"{guild.Name}: GuildId must not be zero.");
             if (guild.WelcomeChannelId == 0)

@@ -7,7 +7,7 @@ namespace BrrainzBot.Modules.Onboarding;
 
 public sealed class OnboardingModule(
     DiscordSocketClient client,
-    BotSettings settings,
+    IBotSettingsProvider settingsProvider,
     IAiProviderClient aiProviderClient,
     IVerificationSessionStore sessionStore,
     IAuditLog auditLog,
@@ -27,35 +27,19 @@ public sealed class OnboardingModule(
         client.UserJoined += HandleUserJoinedAsync;
         client.ButtonExecuted += HandleButtonExecutedAsync;
         client.ModalSubmitted += HandleModalSubmittedAsync;
-        _ = Task.Run(() => RunStaleCleanupLoopAsync(cancellationToken), cancellationToken);
+        settingsProvider.Changed += HandleSettingsChanged;
+        _ = Task.Run(() => RunMaintenanceLoopAsync(cancellationToken), cancellationToken);
         return Task.CompletedTask;
     }
 
     private async Task HandleReadyAsync()
     {
-        foreach (var guildSettings in settings.Guilds.Where(g => g.EnableOnboarding))
-        {
-            var guild = client.GetGuild(guildSettings.GuildId);
-            if (guild == null)
-            {
-                logger.LogWarning("Guild {GuildId} was not found in cache during onboarding initialization.", guildSettings.GuildId);
-                continue;
-            }
-
-            var channel = guild.GetTextChannel(guildSettings.WelcomeChannelId);
-            if (channel == null)
-            {
-                logger.LogWarning("Welcome channel {ChannelId} was not found for guild {GuildId}.", guildSettings.WelcomeChannelId, guildSettings.GuildId);
-                continue;
-            }
-
-            await EnsureWelcomeMessageAsync(channel, guildSettings);
-        }
+        await SyncWelcomeMessagesAsync();
     }
 
     private async Task HandleUserJoinedAsync(SocketGuildUser user)
     {
-        var guildSettings = settings.FindGuild(user.Guild.Id);
+        var guildSettings = FindActiveGuildSettings(user.Guild.Id);
         if (guildSettings is not { EnableOnboarding: true })
             return;
 
@@ -93,7 +77,7 @@ public sealed class OnboardingModule(
         if (component.GuildId is not { } guildId)
             return;
 
-        var guildSettings = settings.FindGuild(guildId);
+        var guildSettings = FindActiveGuildSettings(guildId);
         if (guildSettings is not { EnableOnboarding: true })
             return;
 
@@ -133,7 +117,7 @@ public sealed class OnboardingModule(
         if (modal.GuildId is not { } guildId)
             return;
 
-        var guildSettings = settings.FindGuild(guildId);
+        var guildSettings = FindActiveGuildSettings(guildId);
         if (guildSettings is not { EnableOnboarding: true })
             return;
 
@@ -269,6 +253,15 @@ public sealed class OnboardingModule(
         }
     }
 
+    private void HandleSettingsChanged(BotSettings settings)
+    {
+        _ = Task.Run(SyncWelcomeMessagesAsync);
+        logger.LogInformation("Applied updated activation state from config.");
+    }
+
+    private GuildSettings? FindActiveGuildSettings(ulong guildId) =>
+        settingsProvider.Current.FindGuild(guildId) is { IsActive: true } guildSettings ? guildSettings : null;
+
     private async Task EnsureWelcomeMessageAsync(SocketTextChannel channel, GuildSettings guildSettings)
     {
         var messages = await channel.GetMessagesAsync(limit: 20).FlattenAsync();
@@ -305,15 +298,38 @@ public sealed class OnboardingModule(
         };
     }
 
-    private async Task RunStaleCleanupLoopAsync(CancellationToken cancellationToken)
+    private async Task SyncWelcomeMessagesAsync()
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+        foreach (var guildSettings in settingsProvider.Current.Guilds.Where(g => g.IsActive && g.EnableOnboarding))
+        {
+            var guild = client.GetGuild(guildSettings.GuildId);
+            if (guild == null)
+            {
+                logger.LogWarning("Guild {GuildId} was not found in cache during onboarding initialization.", guildSettings.GuildId);
+                continue;
+            }
+
+            var channel = guild.GetTextChannel(guildSettings.WelcomeChannelId);
+            if (channel == null)
+            {
+                logger.LogWarning("Welcome channel {ChannelId} was not found for guild {GuildId}.", guildSettings.WelcomeChannelId, guildSettings.GuildId);
+                continue;
+            }
+
+            await EnsureWelcomeMessageAsync(channel, guildSettings);
+        }
+    }
+
+    private async Task RunMaintenanceLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
+            await SyncWelcomeMessagesAsync();
             var sessions = await sessionStore.ListAsync(cancellationToken);
             foreach (var session in sessions.Where(s => s.ExpiresAt <= DateTimeOffset.UtcNow))
             {
-                var guildSettings = settings.FindGuild(session.GuildId);
+                var guildSettings = FindActiveGuildSettings(session.GuildId);
                 var guild = client.GetGuild(session.GuildId);
                 var member = guild?.GetUser(session.UserId);
                 if (guildSettings == null || member == null)

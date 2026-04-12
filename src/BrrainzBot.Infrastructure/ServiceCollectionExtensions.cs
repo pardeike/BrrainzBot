@@ -21,6 +21,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(paths);
         services.AddSingleton<BotConfigurationStore>();
         services.AddSingleton<BotDoctor>();
+        services.AddSingleton<ReloadingBotSettingsProvider>();
+        services.AddSingleton<IBotSettingsProvider>(provider => provider.GetRequiredService<ReloadingBotSettingsProvider>());
         services.AddSingleton<IAuditLog, JsonAuditLog>();
         services.AddSingleton<IVerificationSessionStore, JsonVerificationSessionStore>();
         services.AddSingleton<IAiProviderClient, OpenAiCompatibleClient>();
@@ -35,6 +37,7 @@ public static class ServiceCollectionExtensions
                 Discord.GatewayIntents.GuildMessages |
                 Discord.GatewayIntents.MessageContent
         }));
+        services.AddHostedService(provider => provider.GetRequiredService<ReloadingBotSettingsProvider>());
         services.AddHostedService<DiscordGatewayHostedService>();
         return services;
     }

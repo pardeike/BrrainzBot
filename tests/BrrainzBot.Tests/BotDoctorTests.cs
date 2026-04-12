@@ -39,18 +39,18 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
-    public async Task DoctorExplainsWhenBotIsDisabled()
+    public async Task DoctorExplainsWhenGuildIsInactive()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory());
         var settings = new BotSettings
         {
-            Enabled = false,
             Guilds =
             [
                 new GuildSettings
                 {
                     Name = "Test Guild",
                     GuildId = 123,
+                    IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 1000,
@@ -67,7 +67,7 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        Assert.Contains(report.Messages, message => message.Code == "bot.disabled");
+        Assert.Contains(report.Messages, message => message.Code == "guild.inactive");
     }
 
     [Fact]
@@ -91,6 +91,7 @@ public sealed class BotDoctorTests
                 {
                     Name = "Test Guild",
                     GuildId = 123,
+                    IsActive = true,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 1000,
@@ -127,6 +128,7 @@ public sealed class BotDoctorTests
                 {
                     Name = "Test Guild",
                     GuildId = 123,
+                    IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 123,
@@ -159,6 +161,7 @@ public sealed class BotDoctorTests
                 {
                     Name = "Test Guild",
                     GuildId = 123,
+                    IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 789,
@@ -190,6 +193,7 @@ public sealed class BotDoctorTests
                 {
                     Name = "Test Guild",
                     GuildId = 123,
+                    IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 1000,

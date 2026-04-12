@@ -44,8 +44,9 @@ BrrainzBot treats that as part of the product.
 2. Run `brrainzbot setup`.
 3. Follow the prompts.
 4. Run `brrainzbot doctor`.
-5. Turn the bot on in `brrainzbot setup` when you are ready.
-6. Run `brrainzbot run`.
+5. Check `brrainzbot status`.
+6. Turn on the guilds you want.
+7. Run `brrainzbot run`.
 
 If you are starting from zero, use the full docs:
 
@@ -59,6 +60,7 @@ If you are starting from zero, use the full docs:
 
 ```bash
 brrainzbot setup
+brrainzbot status
 brrainzbot doctor
 brrainzbot print-config
 brrainzbot run
@@ -71,7 +73,7 @@ brrainzbot self-update
 - Good defaults.
 - Local state.
 - Manual updates.
-- Off by default.
+- Per-server control.
 - No hidden checks in the background.
 
 ## Development

@@ -7,7 +7,7 @@ namespace BrrainzBot.Modules.SpamGuard;
 
 public sealed class SpamGuardModule(
     DiscordSocketClient client,
-    BotSettings settings,
+    IBotSettingsProvider settingsProvider,
     IAuditLog auditLog,
     ILogger<SpamGuardModule> logger) : IDiscordModule
 {
@@ -33,7 +33,7 @@ public sealed class SpamGuardModule(
         if (message.Author is not SocketGuildUser guildUser)
             return;
 
-        var guildSettings = settings.FindGuild(channel.Guild.Id);
+        var guildSettings = FindActiveGuildSettings(channel.Guild.Id);
         if (guildSettings is not { EnableSpamGuard: true })
             return;
 
@@ -129,7 +129,7 @@ public sealed class SpamGuardModule(
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            foreach (var guildSettings in settings.Guilds.Where(g => g.EnableSpamGuard))
+            foreach (var guildSettings in settingsProvider.Current.Guilds.Where(g => g.IsActive && g.EnableSpamGuard))
             {
                 if (_trackers.TryGetValue(guildSettings.GuildId, out var tracker))
                 {
@@ -138,4 +138,7 @@ public sealed class SpamGuardModule(
             }
         }
     }
+
+    private GuildSettings? FindActiveGuildSettings(ulong guildId) =>
+        settingsProvider.Current.FindGuild(guildId) is { IsActive: true } guildSettings ? guildSettings : null;
 }

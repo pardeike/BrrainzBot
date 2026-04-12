@@ -6,6 +6,12 @@ public interface IDiscordModule
     Task RegisterAsync(CancellationToken cancellationToken);
 }
 
+public interface IBotSettingsProvider
+{
+    BotSettings Current { get; }
+    event Action<BotSettings>? Changed;
+}
+
 public interface IAuditLog
 {
     Task WriteAsync(string eventName, object payload, CancellationToken cancellationToken);

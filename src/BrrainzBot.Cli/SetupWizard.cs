@@ -12,7 +12,6 @@ internal static class SetupWizard
         AnsiConsole.WriteLine();
 
         var friendlyName = AskText("What should this installation call itself?", existingSettings?.FriendlyName ?? "BrrainzBot");
-        var enabled = AskConfirmation("Enable the bot now?", existingSettings?.Enabled ?? false);
         var repository = AskText("Which GitHub repository should self-update use?", existingSettings?.Updates.Repository ?? "ap/BrrainzBot");
         var discordToken = AskSecret("Discord bot token", existingSecrets?.DiscordToken);
         var aiBaseUrl = AskText("OpenAI-compatible base URL", existingSettings?.Ai.BaseUrl ?? "https://api.openai.com/v1");
@@ -35,7 +34,6 @@ internal static class SetupWizard
         var settings = new BotSettings
         {
             FriendlyName = friendlyName,
-            Enabled = enabled,
             GitHubRepository = repository,
             Updates = new UpdateSettings
             {
@@ -72,6 +70,7 @@ internal static class SetupWizard
         {
             Name = name,
             GuildId = AskUlong("Guild ID", existing?.GuildId),
+            IsActive = AskConfirmation("Turn this guild on now?", existing?.IsActive ?? false),
             WelcomeChannelId = AskUlong("Welcome channel ID", existing?.WelcomeChannelId),
             NewRoleId = AskUlong("NEW role ID", existing?.NewRoleId),
             MemberRoleId = AskUlong("MEMBER role ID (or the guild ID to use @everyone)", existing?.MemberRoleId),

@@ -7,34 +7,55 @@ public sealed class BotConfigurationStore
 {
     public async Task<(BotSettings Settings, RuntimeSecrets Secrets)> LoadAsync(AppPaths paths, CancellationToken cancellationToken)
     {
-        if (!File.Exists(paths.ConfigFilePath))
-            throw new FileNotFoundException($"Configuration file not found at {paths.ConfigFilePath}");
-
-        if (!File.Exists(paths.SecretsFilePath))
-            throw new FileNotFoundException($"Secrets file not found at {paths.SecretsFilePath}");
-
-        await using var configStream = File.OpenRead(paths.ConfigFilePath);
-        var settings = await JsonSerializer.DeserializeAsync<BotSettings>(configStream, JsonDefaults.Options, cancellationToken)
-            ?? throw new InvalidOperationException("Failed to read bot settings.");
-
-        await using var secretsStream = File.OpenRead(paths.SecretsFilePath);
-        var secrets = await JsonSerializer.DeserializeAsync<RuntimeSecrets>(secretsStream, JsonDefaults.Options, cancellationToken)
-            ?? throw new InvalidOperationException("Failed to read runtime secrets.");
-
+        var settings = await LoadSettingsAsync(paths, cancellationToken);
+        var secrets = await LoadSecretsAsync(paths, cancellationToken);
         return (settings, secrets);
     }
 
     public async Task SaveAsync(AppPaths paths, BotSettings settings, RuntimeSecrets secrets, CancellationToken cancellationToken)
     {
         paths.EnsureDirectoriesExist();
-        await SaveFileAsync(paths.ConfigFilePath, settings, cancellationToken);
-        await SaveFileAsync(paths.SecretsFilePath, secrets, cancellationToken);
+        await SaveSettingsAsync(paths, settings, cancellationToken);
+        await SaveSecretsAsync(paths, secrets, cancellationToken);
         TryRestrictSecretsFile(paths.SecretsFilePath);
     }
 
     public bool Exists(AppPaths paths) => File.Exists(paths.ConfigFilePath) && File.Exists(paths.SecretsFilePath);
 
     public string ToDisplayJson(BotSettings settings) => JsonSerializer.Serialize(settings, JsonDefaults.Options);
+
+    public async Task<BotSettings> LoadSettingsAsync(AppPaths paths, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(paths.ConfigFilePath))
+            throw new FileNotFoundException($"Configuration file not found at {paths.ConfigFilePath}");
+
+        await using var configStream = File.OpenRead(paths.ConfigFilePath);
+        return await JsonSerializer.DeserializeAsync<BotSettings>(configStream, JsonDefaults.Options, cancellationToken)
+            ?? throw new InvalidOperationException("Failed to read bot settings.");
+    }
+
+    public async Task<RuntimeSecrets> LoadSecretsAsync(AppPaths paths, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(paths.SecretsFilePath))
+            throw new FileNotFoundException($"Secrets file not found at {paths.SecretsFilePath}");
+
+        await using var secretsStream = File.OpenRead(paths.SecretsFilePath);
+        return await JsonSerializer.DeserializeAsync<RuntimeSecrets>(secretsStream, JsonDefaults.Options, cancellationToken)
+            ?? throw new InvalidOperationException("Failed to read runtime secrets.");
+    }
+
+    public async Task SaveSettingsAsync(AppPaths paths, BotSettings settings, CancellationToken cancellationToken)
+    {
+        paths.EnsureDirectoriesExist();
+        await SaveFileAsync(paths.ConfigFilePath, settings, cancellationToken);
+    }
+
+    public async Task SaveSecretsAsync(AppPaths paths, RuntimeSecrets secrets, CancellationToken cancellationToken)
+    {
+        paths.EnsureDirectoriesExist();
+        await SaveFileAsync(paths.SecretsFilePath, secrets, cancellationToken);
+        TryRestrictSecretsFile(paths.SecretsFilePath);
+    }
 
     private static async Task SaveFileAsync<T>(string path, T value, CancellationToken cancellationToken)
     {

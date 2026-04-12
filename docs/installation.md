@@ -19,7 +19,7 @@ Extract the archive somewhere stable. Do not place it inside a temporary downloa
 
 The wizard asks for:
 
-- whether the bot should be enabled now
+- whether each guild should start active or inactive
 - your Discord bot token
 - your OpenAI-compatible endpoint URL
 - your AI model name
@@ -34,7 +34,7 @@ It stores:
 
 Safe default:
 
-- the bot starts out disabled unless you explicitly turn it on
+- guilds start out inactive unless you explicitly turn them on
 - `doctor` can validate everything before the bot touches your servers
 
 ## 3. Validate Before Going Live
@@ -57,7 +57,15 @@ Use this every time you change:
 ./brrainzbot run
 ```
 
-If the bot is still disabled, `run` stays idle and does not connect to Discord. Rerun `setup` when you want to turn it on.
+The bot connects to Discord and reads the current config.
+
+Use this to see or change which guilds are live:
+
+```bash
+./brrainzbot status
+./brrainzbot status on <guildId>
+./brrainzbot status off <guildId>
+```
 
 ## 5. Change an Existing Install
 
