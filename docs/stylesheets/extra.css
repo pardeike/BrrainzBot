@@ -62,8 +62,12 @@ body {
 }
 
 .md-header__button.md-icon {
-  margin: 0 0.05rem 0 0;
+  margin: 0;
   padding: 0.35rem;
+}
+
+.md-header__button[for="__drawer"] {
+  margin-right: -0.25rem;
 }
 
 .md-header__button.md-icon svg {
@@ -83,16 +87,12 @@ body {
 }
 
 .md-header__title {
-  margin-left: -0.05rem;
+  margin-left: -0.35rem;
 }
 
 .md-header__site-link {
   color: inherit;
   text-decoration: none;
-}
-
-.md-search {
-  margin-left: auto;
 }
 
 .md-search__form {
@@ -602,6 +602,25 @@ body {
   .md-header__inner.md-grid {
     max-width: none;
     padding-inline: 1.1rem;
+    position: relative;
+  }
+
+  .md-header__title {
+    margin-right: 18rem;
+  }
+
+  .md-search {
+    position: absolute;
+    right: 1.1rem;
+    top: 50%;
+    z-index: 1;
+    margin-left: 0;
+    transform: translateY(-50%);
+  }
+
+  .md-search__inner,
+  .md-search__form {
+    width: 16rem;
   }
 }
 
