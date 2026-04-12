@@ -1,66 +1,81 @@
 # Configuration
 
-BrrainzBot uses two local files:
+BrrainzBot stores two local files:
 
 - `config.json` for normal settings
 - `secrets.json` for sensitive values
 
-The setup wizard writes both files for you.
+The setup wizard writes both for you.
 
 ## What Lives in `config.json`
 
 - installation name
 - GitHub repository used for self-update
 - AI endpoint base URL and model
-- guild-specific IDs
-- onboarding policy
-- spam-guard policy
+- per-server IDs
+- per-server feature toggles
+- onboarding text and limits
+- spam cleanup settings
 
 ## What Lives in `secrets.json`
 
 - Discord bot token
 - AI API key
 
-## Commands You Will Use Most
+## The Settings You Will Touch Most
 
 ```bash
-./brrainzbot print-config
 ./brrainzbot setup
 ./brrainzbot status
 ./brrainzbot doctor
+./brrainzbot print-config
 ```
 
-## Per-Guild Settings
+## Per-Server Settings
 
-Each guild has its own:
+Each server has its own:
 
-- guild ID
-- active on/off state
+- server ID
+- active on or off state
 - welcome channel ID
-- spam honeypot channel ID when SpamGuard is enabled
+- honeypot channel ID when spam cleanup is on
 - `NEW` role ID
-- `MEMBER` role ID, or the guild ID to use `@everyone`
+- `MEMBER` role ID
 - owner user ID
-- onboarding prompt
+- server topic prompt
 - feature toggles
 
-This is important if you run multiple Discord servers with different communities and different confusion cases.
+## Recommended Role Model
+
+Recommended:
+
+- `NEW` is temporary
+- `MEMBER` grants normal posting
+- `@everyone` does not grant normal posting by itself
+
+Simpler but weaker:
+
+- use `@everyone` as the member state
+- set `MemberRoleId` to the server ID
+- let approval work by removing `NEW`
+
+The simpler model is fine for small low-risk servers. The real `MEMBER` role is safer.
 
 ## Good Prompting for the Onboarding AI
 
-Your guild topic prompt should describe:
+Your server topic prompt should say:
 
 - who the server is for
 - what legitimate users usually want
-- what common off-topic arrivals look like
+- what obvious wrong-server arrivals look like
 - what obvious spam should be rejected
 
-Keep it short and concrete. One strong paragraph is usually enough.
+Keep it short and concrete.
 
 ## Safe Defaults
 
-- guilds off until you turn them on
+- servers start out off
 - `3` attempts
-- `10 minute` cooldown
-- `24 hour` stale timeout
-- owner DMs only for uncertain cases and technical errors
+- `10` minute cooldown
+- `24` hour stale timeout
+- owner DMs only for uncertain cases and technical failures

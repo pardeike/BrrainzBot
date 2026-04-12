@@ -2,79 +2,59 @@
 
 <img src="docs/assets/illustrations/fluffy-bot.png" alt="BrrainzBot robot" width="120" align="right">
 
-BrrainzBot is a Discord bot for two jobs:
+BrrainzBot is a self-hosted Discord bot for two jobs:
 
-- let new people in without clutter
-- keep common spam out without painful setup
+- let real people in without public welcome clutter
+- clean up common spam before it spreads
 
-It is built for self-hosters who want clear setup, clear docs, and predictable behavior.
-
-## What It Does
-
-### Onboarding / Jail
-
-- Lets new users browse most public channels in read-only mode.
-- Keeps the actual verification flow inside `#welcome`.
-- Uses one persistent welcome panel, buttons, modals, and ephemeral replies.
-- Promotes good users to `MEMBER`, or just removes `NEW` on `@everyone`-only servers.
-- Keeps spammy or off-topic users in `NEW`.
-- Auto-kicks stale `NEW` users after a configurable timeout.
-
-### SpamGuard
-
-- Watches for honeypot triggers.
-- Detects near-duplicate cross-channel spam.
-- Deletes old and new messages around a spam trigger.
-- Reuses the practical logic from HoneyPotBot.
-
-## Why This Repo Exists
-
-Most Discord bot projects assume you already know:
-
-- how to register a bot
-- how Discord permissions actually work
-- which roles should grant read access versus write access
-- how to wire an OpenAI-compatible endpoint safely
-
-BrrainzBot treats that as part of the product.
+It is built for admins who want plain setup, plain docs, and calm day-to-day behavior.
 
 ## Quick Start
 
-1. Download a release from GitHub.
+1. Read the [Discord setup guide](docs/discord-setup.md).
 2. Run `brrainzbot setup`.
-3. Follow the prompts.
-4. Run `brrainzbot doctor`.
-5. Check `brrainzbot status`.
-6. Turn on the guilds you want.
-7. Run `brrainzbot run`.
+3. Run `brrainzbot doctor`.
+4. Turn one server on with `brrainzbot enable <serverId>`.
+5. Run `brrainzbot run`.
 
-If you are starting from zero, use the full docs:
+If you only manage one server, `brrainzbot enable` and `brrainzbot disable` also work without an ID.
 
-- [Getting started](docs/index.md)
-- [Discord setup guide](docs/discord-setup.md)
-- [Configuration guide](docs/configuration.md)
-- [OpenAI-compatible endpoint guide](docs/openai-compatible.md)
-- [Operations guide](docs/operations.md)
+## What It Does
 
-## Command Line
+### Onboarding
+
+- keeps the welcome flow inside `#welcome`
+- uses one persistent welcome post, a button, and short prompts
+- replies privately instead of cluttering public chat
+- promotes approved users into normal server access
+
+### Spam cleanup
+
+- watches a honeypot channel
+- catches near-duplicate spam bursts
+- deletes spam around the trigger window
+
+## Core Commands
 
 ```bash
 brrainzbot setup
-brrainzbot status
 brrainzbot doctor
-brrainzbot print-config
+brrainzbot status
+brrainzbot enable <serverId>
+brrainzbot disable <serverId>
 brrainzbot run
+brrainzbot print-config
 brrainzbot self-update
 ```
 
-## Design Principles
+## Docs
 
-- Clear words.
-- Good defaults.
-- Local state.
-- Manual updates.
-- Per-server control.
-- No hidden checks in the background.
+- [Home](https://bot.brrai.nz/)
+- [Installation](docs/installation.md)
+- [Discord setup](docs/discord-setup.md)
+- [Configuration](docs/configuration.md)
+- [OpenAI-compatible endpoints](docs/openai-compatible.md)
+- [Operations](docs/operations.md)
 
 ## Development
 
@@ -83,7 +63,7 @@ dotnet build
 dotnet test
 ```
 
-The docs site uses MkDocs Material and can be built with:
+The docs site uses MkDocs Material:
 
 ```bash
 pip install -r docs/requirements.txt

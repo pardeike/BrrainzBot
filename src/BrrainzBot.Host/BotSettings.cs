@@ -5,17 +5,17 @@ namespace BrrainzBot.Host;
 public sealed class BotSettings
 {
     public string FriendlyName { get; init; } = "BrrainzBot";
-    public string? GitHubRepository { get; init; } = "ap/BrrainzBot";
+    public string? GitHubRepository { get; init; } = "pardeike/BrrainzBot";
     public UpdateSettings Updates { get; init; } = new();
     public AiProviderSettings Ai { get; init; } = new();
-    public List<GuildSettings> Guilds { get; init; } = [];
+    public List<ServerSettings> Servers { get; init; } = [];
 
-    public GuildSettings? FindGuild(ulong guildId) => Guilds.FirstOrDefault(g => g.GuildId == guildId);
+    public ServerSettings? FindServer(ulong serverId) => Servers.FirstOrDefault(s => s.ServerId == serverId);
 }
 
 public sealed class UpdateSettings
 {
-    public string Repository { get; init; } = "ap/BrrainzBot";
+    public string Repository { get; init; } = "pardeike/BrrainzBot";
     public string Channel { get; init; } = "stable";
     public bool Enabled { get; init; } = true;
 }
@@ -24,17 +24,17 @@ public sealed class AiProviderSettings
 {
     public string ProviderType { get; init; } = "OpenAiCompatible";
     public string BaseUrl { get; init; } = "https://api.openai.com/v1";
-    public string Model { get; init; } = "gpt-4.1-mini";
+    public string Model { get; init; } = "gpt-5.4-nano";
     public bool RequireHttps { get; init; } = true;
     public bool AllowInsecureLocalEndpoint { get; init; }
     public string ApiKeyEnvironmentVariable { get; init; } = "BRRAINZBOT_OPENAI_API_KEY";
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
 }
 
-public sealed class GuildSettings
+public sealed class ServerSettings
 {
     public string Name { get; init; } = "My Discord Server";
-    public ulong GuildId { get; init; }
+    public ulong ServerId { get; init; }
     public bool IsActive { get; init; }
     public ulong WelcomeChannelId { get; init; }
     public ulong NewRoleId { get; init; }
@@ -42,13 +42,13 @@ public sealed class GuildSettings
     public ulong OwnerUserId { get; init; }
     public bool EnableOnboarding { get; init; } = true;
     public bool EnableSpamGuard { get; init; } = true;
-    public string GuildTopicPrompt { get; init; } = string.Empty;
+    public string ServerTopicPrompt { get; init; } = string.Empty;
     public List<ulong> PublicReadOnlyChannelIds { get; init; } = [];
     public OnboardingSettings Onboarding { get; init; } = new();
     public SpamGuardSettings SpamGuard { get; init; } = new();
 
     [JsonIgnore]
-    public bool UsesEveryoneAsMemberState => GuildId != 0 && MemberRoleId == GuildId;
+    public bool UsesEveryoneAsMemberState => ServerId != 0 && MemberRoleId == ServerId;
 }
 
 public sealed class OnboardingSettings

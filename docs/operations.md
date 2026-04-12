@@ -6,19 +6,38 @@
 ./brrainzbot run
 ```
 
-The bot reads the current config and keeps honoring per-guild on/off changes while it is running.
+The process stays connected to Discord and keeps honoring per-server on/off changes while it is running.
 
-## See or Change Guild Status
+## See Server Status
 
 ```bash
 ./brrainzbot status
-./brrainzbot status on <guildId>
-./brrainzbot status off <guildId>
+```
+
+## Turn a Server On or Off
+
+```bash
+./brrainzbot enable <serverId>
+./brrainzbot disable <serverId>
+```
+
+If you only manage one server, these also work:
+
+```bash
+./brrainzbot enable
+./brrainzbot disable
 ```
 
 ## Revalidate After Changes
 
-Any time you change roles, channels, or tokens:
+Any time you change:
+
+- roles
+- channels
+- tokens
+- AI endpoint settings
+
+run:
 
 ```bash
 ./brrainzbot doctor
@@ -30,7 +49,7 @@ Any time you change roles, channels, or tokens:
 ./brrainzbot print-config
 ```
 
-Secrets are redacted in the output.
+Secrets stay redacted in the output.
 
 ## Update the Installed Binary
 
@@ -49,38 +68,42 @@ Before it replaces the binary, it shows:
 
 ## Logs
 
-The bot writes local JSONL audit logs. These are useful for:
+The bot writes local JSONL audit logs for:
 
 - uncertain verification cases
-- debugging technical failures
-- reviewing stale-user kicks
-- inspecting spam-trigger events
+- technical failures
+- stale-user kicks
+- spam-trigger events
 
 ## Common Problems
 
 ### The bot cannot move users between roles
 
-Check the Discord role order. The bot role must sit above both `NEW` and `MEMBER`.
+The bot role is too low in Discord.
 
-If you use `@everyone` as the member state, the bot still needs to sit above `NEW`.
+Move it above:
 
-### The bot cannot see the welcome channel
+- `NEW`
+- `MEMBER` if you use the recommended role model
 
-Run `doctor` and verify the welcome channel ID and permissions.
+### The bot cannot see `#welcome`
 
-### Self-update does nothing
+Run `doctor` and check:
 
-Check that:
+- welcome channel ID
+- `#welcome` permissions
+- role visibility rules
 
-- the configured GitHub repository is correct
-- the release exists
-- there is a published asset for your platform
+### New users can still post too early
 
-### New users can still talk in public channels
+That is a permission-layout problem, not a runtime bug.
 
-That is a Discord permission layout problem, not a bot bug.
+Safer model:
 
-Use one of these models:
+- real `MEMBER` role
+- `@everyone` can view but not post
 
-- separate `MEMBER` role: normal send access comes from `MEMBER`, not `@everyone`
-- `@everyone` member state: normal send access comes from `@everyone`, and `NEW` explicitly denies sending until approval
+Simpler model:
+
+- `@everyone` is the member state
+- `NEW` explicitly denies posting until approval

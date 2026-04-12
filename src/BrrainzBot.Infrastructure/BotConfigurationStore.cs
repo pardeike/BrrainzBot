@@ -29,9 +29,16 @@ public sealed class BotConfigurationStore
         if (!File.Exists(paths.ConfigFilePath))
             throw new FileNotFoundException($"Configuration file not found at {paths.ConfigFilePath}");
 
-        await using var configStream = File.OpenRead(paths.ConfigFilePath);
-        return await JsonSerializer.DeserializeAsync<BotSettings>(configStream, JsonDefaults.Options, cancellationToken)
+        var json = await File.ReadAllTextAsync(paths.ConfigFilePath, cancellationToken);
+        var settings = JsonSerializer.Deserialize<BotSettings>(json, JsonDefaults.Options)
             ?? throw new InvalidOperationException("Failed to read bot settings.");
+
+        if (settings.Servers.Count > 0 || !json.Contains("\"Guilds\"", StringComparison.Ordinal))
+            return settings;
+
+        var legacy = JsonSerializer.Deserialize<LegacyBotSettings>(json, JsonDefaults.Options)
+            ?? throw new InvalidOperationException("Failed to read legacy bot settings.");
+        return legacy.ToBotSettings();
     }
 
     public async Task<RuntimeSecrets> LoadSecretsAsync(AppPaths paths, CancellationToken cancellationToken)
@@ -81,5 +88,57 @@ public sealed class BotConfigurationStore
         {
             // File mode hardening is best effort. The doctor command still warns if secrets look unsafe.
         }
+    }
+
+    private sealed class LegacyBotSettings
+    {
+        public string FriendlyName { get; init; } = "BrrainzBot";
+        public string? GitHubRepository { get; init; }
+        public UpdateSettings Updates { get; init; } = new();
+        public AiProviderSettings Ai { get; init; } = new();
+        public List<LegacyGuildSettings> Guilds { get; init; } = [];
+
+        public BotSettings ToBotSettings() => new()
+        {
+            FriendlyName = FriendlyName,
+            GitHubRepository = GitHubRepository,
+            Updates = Updates,
+            Ai = Ai,
+            Servers = [.. Guilds.Select(guild => guild.ToServerSettings())]
+        };
+    }
+
+    private sealed class LegacyGuildSettings
+    {
+        public string Name { get; init; } = "My Discord Server";
+        public ulong GuildId { get; init; }
+        public bool IsActive { get; init; }
+        public ulong WelcomeChannelId { get; init; }
+        public ulong NewRoleId { get; init; }
+        public ulong MemberRoleId { get; init; }
+        public ulong OwnerUserId { get; init; }
+        public bool EnableOnboarding { get; init; } = true;
+        public bool EnableSpamGuard { get; init; } = true;
+        public string GuildTopicPrompt { get; init; } = string.Empty;
+        public List<ulong> PublicReadOnlyChannelIds { get; init; } = [];
+        public OnboardingSettings Onboarding { get; init; } = new();
+        public SpamGuardSettings SpamGuard { get; init; } = new();
+
+        public ServerSettings ToServerSettings() => new()
+        {
+            Name = Name,
+            ServerId = GuildId,
+            IsActive = IsActive,
+            WelcomeChannelId = WelcomeChannelId,
+            NewRoleId = NewRoleId,
+            MemberRoleId = MemberRoleId,
+            OwnerUserId = OwnerUserId,
+            EnableOnboarding = EnableOnboarding,
+            EnableSpamGuard = EnableSpamGuard,
+            ServerTopicPrompt = GuildTopicPrompt,
+            PublicReadOnlyChannelIds = [.. PublicReadOnlyChannelIds],
+            Onboarding = Onboarding,
+            SpamGuard = SpamGuard
+        };
     }
 }

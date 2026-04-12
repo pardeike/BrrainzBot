@@ -39,31 +39,31 @@ public sealed class OnboardingModule(
 
     private async Task HandleUserJoinedAsync(SocketGuildUser user)
     {
-        var guildSettings = FindActiveGuildSettings(user.Guild.Id);
-        if (guildSettings is not { EnableOnboarding: true })
+        var serverSettings = FindActiveServerSettings(user.Guild.Id);
+        if (serverSettings is not { EnableOnboarding: true })
             return;
 
-        var newRole = user.Guild.GetRole(guildSettings.NewRoleId);
+        var newRole = user.Guild.GetRole(serverSettings.NewRoleId);
         if (newRole == null)
         {
-            logger.LogWarning("The NEW role {RoleId} is missing for guild {GuildId}.", guildSettings.NewRoleId, user.Guild.Id);
+            logger.LogWarning("The NEW role {RoleId} is missing for server {ServerId}.", serverSettings.NewRoleId, user.Guild.Id);
             return;
         }
 
         await user.AddRoleAsync(newRole);
         var session = new VerificationSession
         {
-            GuildId = user.Guild.Id,
+            ServerId = user.Guild.Id,
             UserId = user.Id,
             UserName = user.DisplayName,
             JoinedAt = DateTimeOffset.UtcNow,
-            ExpiresAt = DateTimeOffset.UtcNow.Add(guildSettings.Onboarding.StaleTimeout)
+            ExpiresAt = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.StaleTimeout)
         };
 
         await sessionStore.UpsertAsync(session, CancellationToken.None);
         await auditLog.WriteAsync("user_joined", new
         {
-            guildId = user.Guild.Id,
+            serverId = user.Guild.Id,
             userId = user.Id,
             userName = user.DisplayName
         }, CancellationToken.None);
@@ -74,14 +74,14 @@ public sealed class OnboardingModule(
         if (!string.Equals(component.Data.CustomId, StartVerificationCustomId, StringComparison.Ordinal))
             return;
 
-        if (component.GuildId is not { } guildId)
+        if (component.GuildId is not { } serverId)
             return;
 
-        var guildSettings = FindActiveGuildSettings(guildId);
-        if (guildSettings is not { EnableOnboarding: true })
+        var serverSettings = FindActiveServerSettings(serverId);
+        if (serverSettings is not { EnableOnboarding: true })
             return;
 
-        var session = await GetOrCreateSessionAsync(guildId, component.User, guildSettings.Onboarding.StaleTimeout);
+        var session = await GetOrCreateSessionAsync(serverId, component.User, serverSettings.Onboarding.StaleTimeout);
         if (session.CooldownUntil is { } cooldownUntil && cooldownUntil > DateTimeOffset.UtcNow)
         {
             await component.RespondAsync(
@@ -90,7 +90,7 @@ public sealed class OnboardingModule(
             return;
         }
 
-        if (session.AttemptCount >= guildSettings.Onboarding.MaxAttempts)
+        if (session.AttemptCount >= serverSettings.Onboarding.MaxAttempts)
         {
             await component.RespondAsync(
                 "You have used all verification attempts for now. Please wait for a moderator or rejoin later.",
@@ -101,9 +101,9 @@ public sealed class OnboardingModule(
         var modal = new ModalBuilder()
             .WithTitle("Quick verification")
             .WithCustomId(VerificationModalCustomId)
-            .AddTextInput(guildSettings.Onboarding.FirstQuestionLabel, WhyHereCustomId, TextInputStyle.Paragraph, maxLength: 300)
-            .AddTextInput(guildSettings.Onboarding.SecondQuestionLabel, WhatDoYouWantCustomId, TextInputStyle.Paragraph, maxLength: 300)
-            .AddTextInput(guildSettings.Onboarding.ThirdQuestionLabel, RuleParaphraseCustomId, TextInputStyle.Paragraph, maxLength: 300)
+            .AddTextInput(serverSettings.Onboarding.FirstQuestionLabel, WhyHereCustomId, TextInputStyle.Paragraph, maxLength: 300)
+            .AddTextInput(serverSettings.Onboarding.SecondQuestionLabel, WhatDoYouWantCustomId, TextInputStyle.Paragraph, maxLength: 300)
+            .AddTextInput(serverSettings.Onboarding.ThirdQuestionLabel, RuleParaphraseCustomId, TextInputStyle.Paragraph, maxLength: 300)
             .Build();
 
         await component.RespondWithModalAsync(modal);
@@ -114,15 +114,15 @@ public sealed class OnboardingModule(
         if (!string.Equals(modal.Data.CustomId, VerificationModalCustomId, StringComparison.Ordinal))
             return;
 
-        if (modal.GuildId is not { } guildId)
+        if (modal.GuildId is not { } serverId)
             return;
 
-        var guildSettings = FindActiveGuildSettings(guildId);
-        if (guildSettings is not { EnableOnboarding: true })
+        var serverSettings = FindActiveServerSettings(serverId);
+        if (serverSettings is not { EnableOnboarding: true })
             return;
 
-        var session = await GetOrCreateSessionAsync(guildId, modal.User, guildSettings.Onboarding.StaleTimeout);
-        if (session.AttemptCount >= guildSettings.Onboarding.MaxAttempts)
+        var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
+        if (session.AttemptCount >= serverSettings.Onboarding.MaxAttempts)
         {
             await modal.RespondAsync("You have already used all verification attempts.", ephemeral: true);
             return;
@@ -136,9 +136,9 @@ public sealed class OnboardingModule(
 
         session.AttemptCount++;
         var prompt = new VerificationPrompt(
-            guildSettings.Name,
-            guildSettings.GuildTopicPrompt,
-            guildSettings.Onboarding.RulesHint,
+            serverSettings.Name,
+            serverSettings.ServerTopicPrompt,
+            serverSettings.Onboarding.RulesHint,
             modal.User.Username,
             modal.User.Id,
             session.AttemptCount,
@@ -154,27 +154,27 @@ public sealed class OnboardingModule(
             switch (decision.Outcome)
             {
                 case VerificationOutcome.Approve:
-                    await ApproveAsync(modal, guildSettings, session, decision);
+                    await ApproveAsync(modal, serverSettings, session, decision);
                     break;
                 case VerificationOutcome.Retry:
-                    await RetryAsync(modal, guildSettings, session, decision, notifyOwner: false);
+                    await RetryAsync(modal, serverSettings, session, decision, notifyOwner: false);
                     break;
                 default:
-                    await RetryAsync(modal, guildSettings, session, decision, notifyOwner: guildSettings.Onboarding.NotifyOwnerOnUncertain);
+                    await RetryAsync(modal, serverSettings, session, decision, notifyOwner: serverSettings.Onboarding.NotifyOwnerOnUncertain);
                     break;
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Verification failed for user {UserId} in guild {GuildId}", modal.User.Id, guildId);
+            logger.LogError(ex, "Verification failed for user {UserId} in server {ServerId}", modal.User.Id, serverId);
             session.LastDecisionReason = ex.Message;
             session.LastOutcome = VerificationOutcome.Uncertain;
-            session.CooldownUntil = DateTimeOffset.UtcNow.Add(guildSettings.Onboarding.Cooldown);
+            session.CooldownUntil = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.Cooldown);
             await sessionStore.UpsertAsync(session, CancellationToken.None);
-            await NotifyOwnerAsync(guildSettings, $"Technical failure during verification for {modal.User.Username} ({modal.User.Id}). Error: {ex.Message}");
+            await NotifyOwnerAsync(serverSettings, $"Technical failure during verification for {modal.User.Username} ({modal.User.Id}). Error: {ex.Message}");
             await auditLog.WriteAsync("verification_technical_failure", new
             {
-                guildId,
+                serverId,
                 userId = modal.User.Id,
                 error = ex.Message
             }, CancellationToken.None);
@@ -182,45 +182,45 @@ public sealed class OnboardingModule(
         }
     }
 
-    private async Task ApproveAsync(SocketModal modal, GuildSettings guildSettings, VerificationSession session, VerificationDecision decision)
+    private async Task ApproveAsync(SocketModal modal, ServerSettings serverSettings, VerificationSession session, VerificationDecision decision)
     {
-        var guild = client.GetGuild(guildSettings.GuildId);
-        var member = guild?.GetUser(modal.User.Id);
-        if (guild == null || member == null)
-            throw new InvalidOperationException("The guild member could not be resolved during approval.");
+        var server = client.GetGuild(serverSettings.ServerId);
+        var member = server?.GetUser(modal.User.Id);
+        if (server == null || member == null)
+            throw new InvalidOperationException("The server member could not be resolved during approval.");
 
-        var newRole = guild.GetRole(guildSettings.NewRoleId);
+        var newRole = server.GetRole(serverSettings.NewRoleId);
         if (newRole == null)
             throw new InvalidOperationException("The NEW role is missing for approval.");
 
-        if (!guildSettings.UsesEveryoneAsMemberState)
+        if (!serverSettings.UsesEveryoneAsMemberState)
         {
-            var memberRole = guild.GetRole(guildSettings.MemberRoleId)
+            var memberRole = server.GetRole(serverSettings.MemberRoleId)
                 ?? throw new InvalidOperationException("The member role is missing for approval.");
             await member.AddRoleAsync(memberRole);
         }
 
         await member.RemoveRoleAsync(newRole);
-        await sessionStore.RemoveAsync(session.GuildId, session.UserId, CancellationToken.None);
+        await sessionStore.RemoveAsync(session.ServerId, session.UserId, CancellationToken.None);
         await auditLog.WriteAsync("verification_approved", new
         {
-            guildId = session.GuildId,
+            serverId = session.ServerId,
             userId = session.UserId,
             reason = decision.Reason,
             confidence = decision.Confidence,
-            usesEveryoneAsMemberState = guildSettings.UsesEveryoneAsMemberState
+            usesEveryoneAsMemberState = serverSettings.UsesEveryoneAsMemberState
         }, CancellationToken.None);
         await modal.RespondAsync(decision.FriendlyReply, ephemeral: true);
     }
 
-    private async Task RetryAsync(SocketModal modal, GuildSettings guildSettings, VerificationSession session, VerificationDecision decision, bool notifyOwner)
+    private async Task RetryAsync(SocketModal modal, ServerSettings serverSettings, VerificationSession session, VerificationDecision decision, bool notifyOwner)
     {
-        var cooldown = decision.SuggestedCooldown ?? guildSettings.Onboarding.Cooldown;
+        var cooldown = decision.SuggestedCooldown ?? serverSettings.Onboarding.Cooldown;
         session.CooldownUntil = DateTimeOffset.UtcNow.Add(cooldown);
         await sessionStore.UpsertAsync(session, CancellationToken.None);
         await auditLog.WriteAsync("verification_retry", new
         {
-            guildId = session.GuildId,
+            serverId = session.ServerId,
             userId = session.UserId,
             outcome = decision.Outcome.ToString(),
             reason = decision.Reason,
@@ -230,26 +230,26 @@ public sealed class OnboardingModule(
 
         if (notifyOwner)
         {
-            await NotifyOwnerAsync(guildSettings,
-                $"Uncertain verification in {guildSettings.Name} for {modal.User.Username} ({modal.User.Id}). Reason: {decision.Reason}");
+            await NotifyOwnerAsync(serverSettings,
+                $"Uncertain verification in {serverSettings.Name} for {modal.User.Username} ({modal.User.Id}). Reason: {decision.Reason}");
         }
 
         await modal.RespondAsync(decision.FriendlyReply, ephemeral: true);
     }
 
-    private async Task NotifyOwnerAsync(GuildSettings guildSettings, string content)
+    private async Task NotifyOwnerAsync(ServerSettings serverSettings, string content)
     {
         try
         {
-            var guild = client.GetGuild(guildSettings.GuildId);
-            IUser? owner = guild?.GetUser(guildSettings.OwnerUserId);
-            owner ??= await client.Rest.GetUserAsync(guildSettings.OwnerUserId);
+            var server = client.GetGuild(serverSettings.ServerId);
+            IUser? owner = server?.GetUser(serverSettings.OwnerUserId);
+            owner ??= await client.Rest.GetUserAsync(serverSettings.OwnerUserId);
             if (owner != null)
                 await owner.SendMessageAsync(content);
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to notify owner {OwnerUserId} for guild {GuildId}", guildSettings.OwnerUserId, guildSettings.GuildId);
+            logger.LogWarning(ex, "Failed to notify owner {OwnerUserId} for server {ServerId}", serverSettings.OwnerUserId, serverSettings.ServerId);
         }
     }
 
@@ -259,38 +259,38 @@ public sealed class OnboardingModule(
         logger.LogInformation("Applied updated activation state from config.");
     }
 
-    private GuildSettings? FindActiveGuildSettings(ulong guildId) =>
-        settingsProvider.Current.FindGuild(guildId) is { IsActive: true } guildSettings ? guildSettings : null;
+    private ServerSettings? FindActiveServerSettings(ulong serverId) =>
+        settingsProvider.Current.FindServer(serverId) is { IsActive: true } serverSettings ? serverSettings : null;
 
-    private async Task EnsureWelcomeMessageAsync(SocketTextChannel channel, GuildSettings guildSettings)
+    private async Task EnsureWelcomeMessageAsync(SocketTextChannel channel, ServerSettings serverSettings)
     {
         var messages = await channel.GetMessagesAsync(limit: 20).FlattenAsync();
         var existing = messages.FirstOrDefault(m =>
             m.Author.Id == client.CurrentUser.Id &&
             m.Components.Any() &&
-            m.Embeds.Any(embed => string.Equals(embed.Title, guildSettings.Onboarding.WelcomeMessageTitle, StringComparison.Ordinal)));
+            m.Embeds.Any(embed => string.Equals(embed.Title, serverSettings.Onboarding.WelcomeMessageTitle, StringComparison.Ordinal)));
 
         if (existing != null)
             return;
 
         var embed = new EmbedBuilder()
-            .WithTitle(guildSettings.Onboarding.WelcomeMessageTitle)
-            .WithDescription($"{guildSettings.Onboarding.WelcomeMessageBody}\n\n{guildSettings.Onboarding.RulesHint}")
+            .WithTitle(serverSettings.Onboarding.WelcomeMessageTitle)
+            .WithDescription($"{serverSettings.Onboarding.WelcomeMessageBody}\n\n{serverSettings.Onboarding.RulesHint}")
             .WithColor(new Color(77, 122, 255))
             .Build();
 
         var component = new ComponentBuilder()
-            .WithButton(guildSettings.Onboarding.StartButtonLabel, StartVerificationCustomId, ButtonStyle.Primary)
+            .WithButton(serverSettings.Onboarding.StartButtonLabel, StartVerificationCustomId, ButtonStyle.Primary)
             .Build();
 
         await channel.SendMessageAsync(embed: embed, components: component);
     }
 
-    private async Task<VerificationSession> GetOrCreateSessionAsync(ulong guildId, IUser user, TimeSpan staleTimeout)
+    private async Task<VerificationSession> GetOrCreateSessionAsync(ulong serverId, IUser user, TimeSpan staleTimeout)
     {
-        return await sessionStore.GetAsync(guildId, user.Id, CancellationToken.None) ?? new VerificationSession
+        return await sessionStore.GetAsync(serverId, user.Id, CancellationToken.None) ?? new VerificationSession
         {
-            GuildId = guildId,
+            ServerId = serverId,
             UserId = user.Id,
             UserName = user.Username,
             JoinedAt = DateTimeOffset.UtcNow,
@@ -300,23 +300,23 @@ public sealed class OnboardingModule(
 
     private async Task SyncWelcomeMessagesAsync()
     {
-        foreach (var guildSettings in settingsProvider.Current.Guilds.Where(g => g.IsActive && g.EnableOnboarding))
+        foreach (var serverSettings in settingsProvider.Current.Servers.Where(s => s.IsActive && s.EnableOnboarding))
         {
-            var guild = client.GetGuild(guildSettings.GuildId);
-            if (guild == null)
+            var server = client.GetGuild(serverSettings.ServerId);
+            if (server == null)
             {
-                logger.LogWarning("Guild {GuildId} was not found in cache during onboarding initialization.", guildSettings.GuildId);
+                logger.LogWarning("Server {ServerId} was not found in cache during onboarding initialization.", serverSettings.ServerId);
                 continue;
             }
 
-            var channel = guild.GetTextChannel(guildSettings.WelcomeChannelId);
+            var channel = server.GetTextChannel(serverSettings.WelcomeChannelId);
             if (channel == null)
             {
-                logger.LogWarning("Welcome channel {ChannelId} was not found for guild {GuildId}.", guildSettings.WelcomeChannelId, guildSettings.GuildId);
+                logger.LogWarning("Welcome channel {ChannelId} was not found for server {ServerId}.", serverSettings.WelcomeChannelId, serverSettings.ServerId);
                 continue;
             }
 
-            await EnsureWelcomeMessageAsync(channel, guildSettings);
+            await EnsureWelcomeMessageAsync(channel, serverSettings);
         }
     }
 
@@ -329,28 +329,28 @@ public sealed class OnboardingModule(
             var sessions = await sessionStore.ListAsync(cancellationToken);
             foreach (var session in sessions.Where(s => s.ExpiresAt <= DateTimeOffset.UtcNow))
             {
-                var guildSettings = FindActiveGuildSettings(session.GuildId);
-                var guild = client.GetGuild(session.GuildId);
-                var member = guild?.GetUser(session.UserId);
-                if (guildSettings == null || member == null)
+                var serverSettings = FindActiveServerSettings(session.ServerId);
+                var server = client.GetGuild(session.ServerId);
+                var member = server?.GetUser(session.UserId);
+                if (serverSettings == null || member == null)
                 {
-                    await sessionStore.RemoveAsync(session.GuildId, session.UserId, cancellationToken);
+                    await sessionStore.RemoveAsync(session.ServerId, session.UserId, cancellationToken);
                     continue;
                 }
 
                 try
                 {
                     await member.KickAsync("Verification expired");
-                    await sessionStore.RemoveAsync(session.GuildId, session.UserId, cancellationToken);
+                    await sessionStore.RemoveAsync(session.ServerId, session.UserId, cancellationToken);
                     await auditLog.WriteAsync("verification_expired", new
                     {
-                        guildId = session.GuildId,
+                        serverId = session.ServerId,
                         userId = session.UserId
                     }, cancellationToken);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to kick stale NEW user {UserId} from guild {GuildId}", session.UserId, session.GuildId);
+                    logger.LogWarning(ex, "Failed to kick stale NEW user {UserId} from server {ServerId}", session.UserId, session.ServerId);
                 }
             }
         }

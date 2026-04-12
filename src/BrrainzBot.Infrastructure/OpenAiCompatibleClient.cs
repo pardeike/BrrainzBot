@@ -41,9 +41,9 @@ Rules:
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", secrets.AiApiKey);
 
         var userPrompt = $$"""
-Guild: {{prompt.GuildName}}
-Guild guidance:
-{{prompt.GuildTopicPrompt}}
+Server: {{prompt.ServerName}}
+Server guidance:
+{{prompt.ServerTopicPrompt}}
 
 Rules hint:
 {{prompt.RulesHint}}

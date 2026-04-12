@@ -33,14 +33,14 @@ public sealed class SpamGuardModule(
         if (message.Author is not SocketGuildUser guildUser)
             return;
 
-        var guildSettings = FindActiveGuildSettings(channel.Guild.Id);
-        if (guildSettings is not { EnableSpamGuard: true })
+        var serverSettings = FindActiveServerSettings(channel.Guild.Id);
+        if (serverSettings is not { EnableSpamGuard: true })
             return;
 
         if (guildUser.GuildPermissions.Administrator || guildUser.GuildPermissions.ManageMessages || guildUser.GuildPermissions.ModerateMembers)
             return;
 
-        var spamSettings = guildSettings.SpamGuard;
+        var spamSettings = serverSettings.SpamGuard;
         var tracker = GetTracker(channel.Guild.Id, spamSettings);
         var (result, firstChannelId) = tracker.CheckMessage(message.Author.Id, channel.Id, message.Content, message.Timestamp);
 
@@ -64,7 +64,7 @@ public sealed class SpamGuardModule(
         {
             await auditLog.WriteAsync("spam_detected", new
             {
-                guildId = channel.Guild.Id,
+                serverId = channel.Guild.Id,
                 channelId = channel.Id,
                 userId = message.Author.Id,
                 userName = message.Author.Username,
@@ -109,18 +109,18 @@ public sealed class SpamGuardModule(
         }
     }
 
-    private MessageTracker GetTracker(ulong guildId, SpamGuardSettings settingsForGuild)
+    private MessageTracker GetTracker(ulong serverId, SpamGuardSettings settingsForServer)
     {
-        if (_trackers.TryGetValue(guildId, out var tracker))
+        if (_trackers.TryGetValue(serverId, out var tracker))
             return tracker;
 
         tracker = new MessageTracker(
-            settingsForGuild.MessageDeltaIntervalSeconds,
-            settingsForGuild.MinimumMessageLength,
-            settingsForGuild.LinkRequired,
-            settingsForGuild.MessageSimilarityThreshold,
-            settingsForGuild.HoneypotChannelId);
-        _trackers[guildId] = tracker;
+            settingsForServer.MessageDeltaIntervalSeconds,
+            settingsForServer.MinimumMessageLength,
+            settingsForServer.LinkRequired,
+            settingsForServer.MessageSimilarityThreshold,
+            settingsForServer.HoneypotChannelId);
+        _trackers[serverId] = tracker;
         return tracker;
     }
 
@@ -129,16 +129,16 @@ public sealed class SpamGuardModule(
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            foreach (var guildSettings in settingsProvider.Current.Guilds.Where(g => g.IsActive && g.EnableSpamGuard))
+            foreach (var serverSettings in settingsProvider.Current.Servers.Where(s => s.IsActive && s.EnableSpamGuard))
             {
-                if (_trackers.TryGetValue(guildSettings.GuildId, out var tracker))
+                if (_trackers.TryGetValue(serverSettings.ServerId, out var tracker))
                 {
-                    tracker.PerformPeriodicCleanup(DateTimeOffset.UtcNow, guildSettings.SpamGuard.MessageDeltaIntervalSeconds);
+                    tracker.PerformPeriodicCleanup(DateTimeOffset.UtcNow, serverSettings.SpamGuard.MessageDeltaIntervalSeconds);
                 }
             }
         }
     }
 
-    private GuildSettings? FindActiveGuildSettings(ulong guildId) =>
-        settingsProvider.Current.FindGuild(guildId) is { IsActive: true } guildSettings ? guildSettings : null;
+    private ServerSettings? FindActiveServerSettings(ulong serverId) =>
+        settingsProvider.Current.FindServer(serverId) is { IsActive: true } serverSettings ? serverSettings : null;
 }

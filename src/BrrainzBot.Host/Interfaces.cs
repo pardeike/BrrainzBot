@@ -24,8 +24,8 @@ public interface IAiProviderClient
 
 public interface IVerificationSessionStore
 {
-    Task<VerificationSession?> GetAsync(ulong guildId, ulong userId, CancellationToken cancellationToken);
+    Task<VerificationSession?> GetAsync(ulong serverId, ulong userId, CancellationToken cancellationToken);
     Task<IReadOnlyList<VerificationSession>> ListAsync(CancellationToken cancellationToken);
     Task UpsertAsync(VerificationSession session, CancellationToken cancellationToken);
-    Task RemoveAsync(ulong guildId, ulong userId, CancellationToken cancellationToken);
+    Task RemoveAsync(ulong serverId, ulong userId, CancellationToken cancellationToken);
 }

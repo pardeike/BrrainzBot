@@ -7,10 +7,10 @@ public sealed class JsonVerificationSessionStore(AppPaths paths) : IVerification
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public async Task<VerificationSession?> GetAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
+    public async Task<VerificationSession?> GetAsync(ulong serverId, ulong userId, CancellationToken cancellationToken)
     {
         var sessions = await LoadAllAsync(cancellationToken);
-        return sessions.FirstOrDefault(s => s.GuildId == guildId && s.UserId == userId);
+        return sessions.FirstOrDefault(s => s.ServerId == serverId && s.UserId == userId);
     }
 
     public async Task<IReadOnlyList<VerificationSession>> ListAsync(CancellationToken cancellationToken) => await LoadAllAsync(cancellationToken);
@@ -21,7 +21,7 @@ public sealed class JsonVerificationSessionStore(AppPaths paths) : IVerification
         try
         {
             var sessions = await LoadAllInternalAsync(cancellationToken);
-            var index = sessions.FindIndex(s => s.GuildId == session.GuildId && s.UserId == session.UserId);
+            var index = sessions.FindIndex(s => s.ServerId == session.ServerId && s.UserId == session.UserId);
             if (index >= 0)
                 sessions[index] = session;
             else
@@ -35,13 +35,13 @@ public sealed class JsonVerificationSessionStore(AppPaths paths) : IVerification
         }
     }
 
-    public async Task RemoveAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
+    public async Task RemoveAsync(ulong serverId, ulong userId, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var sessions = await LoadAllInternalAsync(cancellationToken);
-            _ = sessions.RemoveAll(s => s.GuildId == guildId && s.UserId == userId);
+            _ = sessions.RemoveAll(s => s.ServerId == serverId && s.UserId == userId);
             await SaveAllInternalAsync(sessions, cancellationToken);
         }
         finally

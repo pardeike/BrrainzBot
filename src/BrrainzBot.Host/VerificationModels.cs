@@ -10,8 +10,8 @@ public enum VerificationOutcome
 public sealed record VerificationAnswers(string WhyHere, string WhatDoYouWant, string RuleParaphrase);
 
 public sealed record VerificationPrompt(
-    string GuildName,
-    string GuildTopicPrompt,
+    string ServerName,
+    string ServerTopicPrompt,
     string RulesHint,
     string UserName,
     ulong UserId,
@@ -27,7 +27,7 @@ public sealed record VerificationDecision(
 
 public sealed class VerificationSession
 {
-    public required ulong GuildId { get; init; }
+    public required ulong ServerId { get; init; }
     public required ulong UserId { get; init; }
     public required string UserName { get; init; }
     public required DateTimeOffset JoinedAt { get; init; }

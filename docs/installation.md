@@ -1,15 +1,31 @@
 # Installation
 
+## Before You Start
+
+Have these ready first:
+
+- a Discord bot token
+- your server ID
+- your `#welcome` channel ID
+- your `NEW` role ID
+- your `MEMBER` role ID
+- your own Discord user ID for owner DMs
+- an AI base URL, model, and API key
+
+If you do not have those yet, start with [Discord setup](discord-setup.md).
+
+Inviting the bot before you enable a server is safe. An installed server stays inactive until you turn it on.
+
 ## 1. Download a Release
 
 Choose the archive that matches your machine:
 
-- `osx-arm64` for modern Apple Silicon Macs
-- `osx-x64` for older Intel Macs
+- `osx-arm64` for Apple Silicon Macs
+- `osx-x64` for Intel Macs
 - `linux-x64` for most Linux servers
 - `win-x64` for Windows
 
-Extract the archive somewhere stable. Do not place it inside a temporary download folder you clean out regularly.
+Extract it somewhere stable. Do not leave it in a temporary downloads folder.
 
 ## 2. Run Setup
 
@@ -17,67 +33,65 @@ Extract the archive somewhere stable. Do not place it inside a temporary downloa
 ./brrainzbot setup
 ```
 
-The wizard asks for:
+The wizard is built around one server first. Finish one server completely. Add more later if you need them.
 
-- whether each guild should start active or inactive
+Setup asks for:
+
+- your installation name
+- the GitHub `owner/repository` used for self-update
 - your Discord bot token
-- your OpenAI-compatible endpoint URL
-- your AI model name
-- your AI API key
-- the Discord IDs for your guild, roles, welcome channel, and spam honeypot channel
-
-It stores:
-
-- normal config in `config.json`
-- secrets in `secrets.json`
-- session state and logs in the same application directory tree
+- your AI endpoint and model
+- one server at a time
 
 Safe default:
 
-- guilds start out inactive unless you explicitly turn them on
-- `doctor` can validate everything before the bot touches your servers
+- servers start out off until you turn them on
+- rerunning `setup` edits the existing install
 
-## 3. Validate Before Going Live
+## 3. Validate Before Go-Live
 
 ```bash
 ./brrainzbot doctor
 ```
 
-Use this every time you change:
+Use this any time you change:
 
-- roles
-- channels
+- server IDs
+- channel IDs
+- role IDs
 - bot token
-- AI endpoint
-- guild IDs
+- AI endpoint settings
 
-## 4. Start the Bot
+## 4. Turn One Server On
+
+```bash
+./brrainzbot status
+./brrainzbot enable <serverId>
+```
+
+If you only manage one server, this also works:
+
+```bash
+./brrainzbot enable
+```
+
+## 5. Start the Bot
 
 ```bash
 ./brrainzbot run
 ```
 
-The bot connects to Discord and reads the current config.
+The process stays connected to Discord and picks up per-server on/off changes while it is running.
 
-Use this to see or change which guilds are live:
-
-```bash
-./brrainzbot status
-./brrainzbot status on <guildId>
-./brrainzbot status off <guildId>
-```
-
-## 5. Change an Existing Install
+## 6. Change an Existing Install
 
 ```bash
 ./brrainzbot setup
 ```
 
-This reruns the guided flow with your current values as defaults.
+This opens the same guided flow with your current values filled in.
 
 ## Optional: Custom Storage Root
-
-You can store the app data somewhere else:
 
 ```bash
 ./brrainzbot setup --root /srv/brrainzbot

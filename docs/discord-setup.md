@@ -1,107 +1,211 @@
 # Discord Setup
 
-This is the part most guides make unnecessarily confusing. Keep the model simple:
+This guide is the whole path from zero to a ready server.
 
-- `NEW` means "can look, cannot participate yet"
-- `MEMBER` means "normal access"
-- `#welcome` is for starting verification
+## Before You Start
 
-There are two valid setups:
+Check these first:
 
-- standard setup: `MEMBER` is a real role that grants normal participation
-- simple setup: use `@everyone` as the member state by entering the guild ID where the bot asks for the member role ID
+- you are logged into the right Discord account
+- that account has permission to invite bots to the target server
+- your Discord account email is verified
+- you know which server you want to test first
 
-## 1. Create the Bot Application
+## 1. Open the Discord Developer Portal
 
-In the Discord Developer Portal:
+Open:
 
-1. Create a new application.
-2. Add a bot user.
+`https://discord.com/developers/applications`
+
+Then click **New Application**.
+
+The application name does not have to be perfect. You can change it later.
+
+## 2. Create the Bot User
+
+Inside the application:
+
+1. Open the **Bot** tab.
+2. If Discord has not created a bot user yet, create one there.
 3. Copy the bot token for `brrainzbot setup`.
-4. Enable the privileged intents your bot needs:
-   - `Server Members Intent`
-   - `Message Content Intent`
 
-## 2. Invite the Bot
+## 3. Turn On the Required Intents
 
-Invite the bot with enough permissions to:
+Still in the **Bot** tab, turn on:
 
-- view channels
-- manage roles
-- manage messages
-- kick members
-- send messages
-- create DMs
+- `Server Members Intent`
+- `Message Content Intent`
 
-Keep the bot role above `NEW` and `MEMBER` in the Discord role order, otherwise it cannot move people between those roles.
+## 4. Ignore the Fields You Do Not Need
 
-If you use the simple setup with `@everyone`, the bot still needs to sit above `NEW`.
+For this self-hosted setup, you can ignore these unless you already know you need them:
 
-## 3. Create the Roles
+- `Interactions Endpoint URL`
+- `Linked Roles Verification URL`
+- `Terms of Service URL`
+- `Privacy Policy URL`
 
-Create:
+## 5. Decide on `Public Bot`
+
+For a normal self-hosted install, keeping `Public Bot` on is fine.
+
+What it means:
+
+- `on`: other people could invite this bot if they had the invite link and the right Discord permissions
+- `off`: only you or your team can invite it
+
+This does **not** mean other people can run code on your machine.
+
+## 6. Generate the Invite Link
+
+Open **OAuth2** → **URL Generator**.
+
+Under **Scopes**, select:
+
+- `bot`
+
+Under **Bot Permissions**, select:
+
+- `View Channels`
+- `Read Message History`
+- `Send Messages`
+- `Manage Messages`
+- `Manage Roles`
+- `Kick Members`
+
+Then copy the generated URL at the bottom.
+
+## 7. Invite the Bot
+
+Open the invite URL in your browser.
+
+Do this once for each server where you want to use the bot:
+
+1. choose the server
+2. authorize the bot
+3. return to Discord
+
+## 8. Create the Roles
+
+In your Discord server, open:
+
+**Server name** → **Server Settings** → **Roles**
+
+Create these roles:
 
 - `NEW`
 - `MEMBER`
 
-Recommended role model:
+Recommended model:
 
-- `@everyone`: read access to the channels you want newcomers to browse, but no send permission in the public discussion channels
-- `NEW`: marker role for jailed users
-- `MEMBER`: the role that actually grants normal send/participation access
+- `@everyone`: can look around, but does not grant normal posting
+- `NEW`: marks new users
+- `MEMBER`: grants normal participation
 
-Simpler role model for small servers:
+Simpler but weaker model:
 
 - `@everyone`: normal member state
-- `NEW`: marker role for jailed users and the role that denies posting in the public channels until approval
+- `NEW`: temporary deny role for new users
 - no separate `MEMBER` role
 
-## 4. Create `#welcome`
+If you choose the simpler model, enter the **server ID** as the member role ID during setup.
 
-Standard setup:
+## 9. Create `#welcome`
 
-- `#welcome` is visible to `@everyone` and `NEW`
-- `#welcome` is hidden from `MEMBER`
+Create a channel called `#welcome`.
 
-Simple setup with `@everyone`:
+You do **not** need to post anything there yourself. BrrainzBot will place the persistent welcome post.
 
-- `#welcome` is hidden from `@everyone`
-- `#welcome` is visible to `NEW`
-- approval hides it by removing `NEW`
+Recommended `MEMBER` model:
 
-In both setups, `#welcome` should not be used as a normal chat room.
+- `@everyone`: can view `#welcome`
+- `NEW`: can view `#welcome`
+- `MEMBER`: cannot view `#welcome`
 
-The bot will place one persistent welcome message there and handle the rest with buttons, modals, and ephemeral replies.
+Simpler `@everyone` model:
 
-## 5. Make Public Channels Read-Only for Newcomers
+- `@everyone`: cannot view `#welcome`
+- `NEW`: can view `#welcome`
 
-For the public channels you want newcomers to browse:
+## 10. Set Public Channel Permissions
 
-- allow view access to `@everyone`
-- deny or leave disabled message sending for `@everyone`
-- grant normal send access to `MEMBER`
+### Recommended `MEMBER` model
 
-That gives new users a good first impression without letting drive-by spam hit the visible channels immediately.
+For the public channels you want newcomers to see:
 
-If you use the simple setup with `@everyone`:
+- `@everyone`: can view
+- `@everyone`: cannot post
+- `MEMBER`: can post
 
-- allow normal send access to `@everyone`
-- deny send access to `NEW`
-- let approval work by removing `NEW`
+This is the safer model. New users never get normal posting access until approval.
 
-## 6. Gather the IDs
+### Simpler `@everyone` model
 
-You will need:
+For the public channels you want newcomers to reach after approval:
 
-- guild ID
-- welcome channel ID
-- spam honeypot channel ID if you use SpamGuard
+- `@everyone`: can view
+- `@everyone`: can post
+- `NEW`: cannot post
+
+This is simpler, but weaker. There is a short join-time window before the bot adds `NEW`.
+
+## 11. Set the Minimum `NEW` Permissions
+
+For the current welcome flow, `NEW` only needs:
+
+- `View Channel`
+- `Read Message History`
+
+`Use Application Commands` is not required for the current button and prompt flow.
+
+## 12. Move the Bot Role Above `NEW`
+
+Open the server role list and move the bot role above:
+
+- `NEW`
+- `MEMBER` if you use the recommended model
+
+If the bot role is too low, the bot cannot move users between roles.
+
+## 13. Gather the IDs
+
+Turn on **Developer Mode** in Discord first:
+
+**User Settings** → **Advanced** → **Developer Mode**
+
+Then copy these IDs:
+
+- server ID
+- `#welcome` channel ID
+- spam honeypot channel ID if you use spam cleanup
 - `NEW` role ID
-- `MEMBER` role ID, or the guild ID if you want to use `@everyone`
-- your own Discord user ID for uncertain-case DMs
+- `MEMBER` role ID, or the server ID if you use `@everyone`
+- your own Discord user ID
 
-To get them:
+## 14. Run Setup
 
-1. Enable Developer Mode in Discord.
-2. Right-click the server, roles, and channel.
-3. Use **Copy ID**.
+Back in the terminal:
+
+```bash
+./brrainzbot setup
+```
+
+## 15. Run Doctor
+
+```bash
+./brrainzbot doctor
+```
+
+Fix anything it reports before you turn the server on.
+
+## 16. Enable the Server
+
+```bash
+./brrainzbot enable <serverId>
+```
+
+## 17. Start the Bot
+
+```bash
+./brrainzbot run
+```

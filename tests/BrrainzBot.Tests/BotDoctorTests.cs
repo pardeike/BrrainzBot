@@ -11,12 +11,12 @@ public sealed class BotDoctorTests
         var doctor = new BotDoctor(new StubHttpClientFactory());
         var settings = new BotSettings
         {
-            Guilds =
+            Servers =
             [
-                new GuildSettings
+                new ServerSettings
                 {
-                    Name = "Test Guild",
-                    GuildId = 0,
+                    Name = "Test Server",
+                    ServerId = 0,
                     WelcomeChannelId = 0,
                     NewRoleId = 0,
                     MemberRoleId = 0,
@@ -35,21 +35,21 @@ public sealed class BotDoctorTests
 
         Assert.True(report.HasErrors);
         Assert.Contains(report.Messages, message => message.Code == "discord.token.empty");
-        Assert.Contains(report.Messages, message => message.Code == "guild.id.zero");
+        Assert.Contains(report.Messages, message => message.Code == "server.id.zero");
     }
 
     [Fact]
-    public async Task DoctorExplainsWhenGuildIsInactive()
+    public async Task DoctorExplainsWhenServerIsInactive()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory());
         var settings = new BotSettings
         {
-            Guilds =
+            Servers =
             [
-                new GuildSettings
+                new ServerSettings
                 {
-                    Name = "Test Guild",
-                    GuildId = 123,
+                    Name = "Test Server",
+                    ServerId = 123,
                     IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
@@ -67,16 +67,24 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        Assert.Contains(report.Messages, message => message.Code == "guild.inactive");
+        Assert.Contains(report.Messages, message => message.Code == "server.inactive");
+        Assert.Contains(report.Messages, message => message.Message.Contains("brrainzbot enable 123", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task DoctorExplainsLikelyCauseWhenGuildCannotBeReached()
+    public async Task DoctorExplainsLikelyCauseWhenServerCannotBeReached()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory(request =>
         {
             if (request.RequestUri?.AbsolutePath == "/api/v10/users/@me")
-                return new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            {
+                return JsonResponse("""
+                    {
+                      "id": "777"
+                    }
+                    """);
+            }
+
             if (request.RequestUri?.AbsolutePath == "/api/v10/guilds/123")
                 return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
 
@@ -85,12 +93,12 @@ public sealed class BotDoctorTests
 
         var settings = new BotSettings
         {
-            Guilds =
+            Servers =
             [
-                new GuildSettings
+                new ServerSettings
                 {
-                    Name = "Test Guild",
-                    GuildId = 123,
+                    Name = "Test Server",
+                    ServerId = 123,
                     IsActive = true,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
@@ -111,23 +119,23 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        var message = Assert.Single(report.Messages, m => m.Code == "discord.guild.unreachable");
-        Assert.Contains("guild ID is wrong", message.Message);
+        var message = Assert.Single(report.Messages, m => m.Code == "discord.server.unreachable");
+        Assert.Contains("server ID is wrong", message.Message);
         Assert.Contains("invited", message.Message);
     }
 
     [Fact]
-    public async Task DoctorExplainsWhenGuildIdIsUsedAsMemberRoleId()
+    public async Task DoctorExplainsWhenServerIdIsUsedAsMemberRoleId()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory());
         var settings = new BotSettings
         {
-            Guilds =
+            Servers =
             [
-                new GuildSettings
+                new ServerSettings
                 {
-                    Name = "Test Guild",
-                    GuildId = 123,
+                    Name = "Test Server",
+                    ServerId = 123,
                     IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
@@ -145,8 +153,8 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        Assert.Contains(report.Messages, message => message.Code == "guild.memberrole.everyone");
-        Assert.DoesNotContain(report.Messages, message => message.Code == "guild.memberrole.zero");
+        Assert.Contains(report.Messages, message => message.Code == "server.memberrole.everyone");
+        Assert.DoesNotContain(report.Messages, message => message.Code == "server.memberrole.zero");
     }
 
     [Fact]
@@ -155,12 +163,12 @@ public sealed class BotDoctorTests
         var doctor = new BotDoctor(new StubHttpClientFactory());
         var settings = new BotSettings
         {
-            Guilds =
+            Servers =
             [
-                new GuildSettings
+                new ServerSettings
                 {
-                    Name = "Test Guild",
-                    GuildId = 123,
+                    Name = "Test Server",
+                    ServerId = 123,
                     IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
@@ -178,7 +186,7 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        Assert.Contains(report.Messages, message => message.Code == "guild.roles.same");
+        Assert.Contains(report.Messages, message => message.Code == "server.roles.same");
     }
 
     [Fact]
@@ -187,12 +195,12 @@ public sealed class BotDoctorTests
         var doctor = new BotDoctor(new StubHttpClientFactory());
         var settings = new BotSettings
         {
-            Guilds =
+            Servers =
             [
-                new GuildSettings
+                new ServerSettings
                 {
-                    Name = "Test Guild",
-                    GuildId = 123,
+                    Name = "Test Server",
+                    ServerId = 123,
                     IsActive = false,
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
@@ -211,7 +219,68 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        Assert.Contains(report.Messages, message => message.Code == "guild.honeypot.zero");
+        Assert.Contains(report.Messages, message => message.Code == "server.honeypot.zero");
+    }
+
+    [Fact]
+    public async Task DoctorWarnsWhenWelcomeChannelLayoutLooksWrongForEveryoneMode()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(request =>
+        {
+            return request.RequestUri?.AbsolutePath switch
+            {
+                "/api/v10/users/@me" => JsonResponse("""{ "id": "777" }"""),
+                "/api/v10/guilds/123" => new HttpResponseMessage(System.Net.HttpStatusCode.OK),
+                "/api/v10/guilds/123/channels" => JsonResponse("""
+                    [
+                      {
+                        "id": "456",
+                        "name": "welcome",
+                        "permission_overwrites": []
+                      }
+                    ]
+                    """),
+                "/api/v10/guilds/123/roles" => JsonResponse("""
+                    [
+                      { "id": "123", "name": "@everyone", "position": 0 },
+                      { "id": "789", "name": "NEW", "position": 1 }
+                    ]
+                    """),
+                "/api/v10/guilds/123/members/777" => JsonResponse("""
+                    {
+                      "roles": [ "555" ]
+                    }
+                    """),
+                _ => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            };
+        }));
+
+        var settings = new BotSettings
+        {
+            Servers =
+            [
+                new ServerSettings
+                {
+                    Name = "Test Server",
+                    ServerId = 123,
+                    IsActive = true,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 123,
+                    OwnerUserId = 999
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, message => message.Code == "discord.welcome.everyone.visible");
+        Assert.Contains(report.Messages, message => message.Code == "discord.welcome.new.hidden");
     }
 
     private static AppPaths CreatePathsWithPlaceholderFiles()
@@ -222,6 +291,11 @@ public sealed class BotDoctorTests
         File.WriteAllText(paths.SecretsFilePath, "{}");
         return paths;
     }
+
+    private static HttpResponseMessage JsonResponse(string json) => new(System.Net.HttpStatusCode.OK)
+    {
+        Content = new StringContent(json)
+    };
 
     private sealed class StubHttpClientFactory(Func<HttpRequestMessage, HttpResponseMessage>? responder = null) : IHttpClientFactory
     {
