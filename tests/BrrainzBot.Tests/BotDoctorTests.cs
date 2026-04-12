@@ -218,6 +218,31 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
+    public async Task DoctorErrorsWhenBotCannotPostInWelcome()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            welcomePermissionOverwrites: """
+                [
+                  { "id": "123", "type": 0, "allow": "0", "deny": "2048" }
+                ]
+                """)));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, message => message.Code == "discord.welcome.bot_cannot_post");
+    }
+
+    [Fact]
     public async Task DoctorReportsMissingRequiredBotPermissions()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(

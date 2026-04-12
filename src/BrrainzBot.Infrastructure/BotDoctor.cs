@@ -128,6 +128,9 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         }
 
         var roles = await LoadRolesAsync(client, server, report, cancellationToken);
+        var botState = roles != null
+            ? await LoadBotStateAsync(client, botUserId, server, roles, report, cancellationToken)
+            : null;
         var channels = await LoadChannelsAsync(client, server, report, cancellationToken);
 
         if (channels != null)
@@ -138,7 +141,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             }
             else if (roles != null)
             {
-                ValidateWelcomeLayout(server, welcomeChannel, channels, roles, report);
+                ValidateWelcomeLayout(server, welcomeChannel, channels, roles, botState, report);
             }
 
             if (server.EnableSpamGuard && !channels.ContainsKey(server.SpamGuard.HoneypotChannelId))
@@ -150,7 +153,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             if (server.MemberRoleId != 0 && !roles.ContainsKey(server.MemberRoleId))
                 report.AddError("discord.memberrole.notfound", $"{server.Name}: MemberRoleId does not exist in the server.");
 
-            await ValidateRoleHierarchyAsync(client, botUserId, server, roles, report, cancellationToken);
+            ValidateBotServerState(server, roles, botState, report);
         }
 
         await ValidateMemberBackfillAsync(client, server, activeSessionUserIds, report, cancellationToken);
@@ -244,9 +247,10 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         ChannelSnapshot welcomeChannel,
         IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
         IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        BotStateSnapshot? botState,
         DiagnosticReport report)
     {
-        if (!HasEffectiveViewAccess(welcomeChannel, channels, roles, [server.ServerId]))
+        if (!HasEffectiveViewAccess(welcomeChannel, channels, roles, server.ServerId, []))
         {
             report.AddWarning(
                 "discord.welcome.everyone.hidden",
@@ -255,15 +259,32 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 
         if (server.MemberRoleId != 0
             && roles.ContainsKey(server.MemberRoleId)
-            && HasEffectiveViewAccess(welcomeChannel, channels, roles, [server.ServerId, server.MemberRoleId]))
+            && HasEffectiveViewAccess(welcomeChannel, channels, roles, server.ServerId, [server.MemberRoleId]))
         {
             report.AddWarning(
                 "discord.welcome.member.visible",
                 $"{server.Name}: MEMBER can still see #welcome. Deny ViewChannel for MEMBER on the channel or its parent category.");
         }
+
+        if (botState != null)
+        {
+            var botEffectivePermissions = GetEffectiveChannelPermissions(welcomeChannel, channels, roles, server.ServerId, botState.RoleIds);
+            if ((botEffectivePermissions & PermissionBit(ChannelPermission.ViewChannel)) == 0)
+            {
+                report.AddError(
+                    "discord.welcome.bot_cannot_view",
+                    $"{server.Name}: the bot cannot view #welcome. Allow ViewChannel for the bot role or one of its roles there.");
+            }
+            else if ((botEffectivePermissions & PermissionBit(ChannelPermission.SendMessages)) == 0)
+            {
+                report.AddError(
+                    "discord.welcome.bot_cannot_post",
+                    $"{server.Name}: the bot cannot post in #welcome. Allow Send Messages for the bot role or one of its roles there.");
+            }
+        }
     }
 
-    private static async Task ValidateRoleHierarchyAsync(
+    private static async Task<BotStateSnapshot?> LoadBotStateAsync(
         HttpClient client,
         ulong botUserId,
         ServerSettings server,
@@ -275,14 +296,14 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         if (!memberResponse.IsSuccessStatusCode)
         {
             report.AddWarning("discord.botmember.unreachable", $"{server.Name}: could not validate the bot role hierarchy remotely.");
-            return;
+            return null;
         }
 
         var raw = await memberResponse.Content.ReadAsStringAsync(cancellationToken);
         using var document = JsonDocument.Parse(raw);
 
         if (!document.RootElement.TryGetProperty("roles", out var roleArray))
-            return;
+            return null;
 
         var botRoleIds = roleArray.EnumerateArray()
             .Select(element => element.GetString())
@@ -298,7 +319,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         if (botRoles.Count == 0)
         {
             report.AddWarning("discord.botrole.unresolved", $"{server.Name}: could not resolve the bot roles in the server role list.");
-            return;
+            return null;
         }
 
         var highestBotRolePosition = botRoles
@@ -309,8 +330,20 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         var botPermissions = new GuildPermissions(botRoles
             .Aggregate(0UL, (combined, role) => combined | role.PermissionsRawValue));
 
+        return new BotStateSnapshot(botRoleIds, highestBotRolePosition, botPermissions);
+    }
+
+    private static void ValidateBotServerState(
+        ServerSettings server,
+        IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        BotStateSnapshot? botState,
+        DiagnosticReport report)
+    {
+        if (botState == null)
+            return;
+
         var missingPermissions = RequiredBotPermissions
-            .Where(requirement => !requirement.HasPermission(botPermissions))
+            .Where(requirement => !requirement.HasPermission(botState.GuildPermissions))
             .Select(requirement => requirement.Name)
             .ToList();
 
@@ -326,7 +359,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         {
             var uncopiableMissingPermissions = DescribeGuildPermissions(
                 everyoneRole.PermissionsRawValue
-                & ~botPermissions.RawValue
+                & ~botState.GuildPermissions.RawValue
                 & ~memberRoleForCopyCheck.PermissionsRawValue);
             if (uncopiableMissingPermissions.Count > 0)
             {
@@ -337,7 +370,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         }
 
         if (roles.TryGetValue(server.MemberRoleId, out var memberRole)
-            && highestBotRolePosition <= memberRole.Position)
+            && botState.HighestRolePosition <= memberRole.Position)
         {
             report.AddError(
                 "discord.role_hierarchy.invalid",
@@ -431,38 +464,50 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         ChannelSnapshot channel,
         IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
         IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        ulong everyoneRoleId,
         IReadOnlyList<ulong> roleIds)
     {
-        var permissions = roleIds
+        var permissions = GetEffectiveChannelPermissions(channel, channels, roles, everyoneRoleId, roleIds);
+        return (permissions & PermissionBit(ChannelPermission.ViewChannel)) != 0;
+    }
+
+    private static ulong GetEffectiveChannelPermissions(
+        ChannelSnapshot channel,
+        IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        ulong everyoneRoleId,
+        IReadOnlyList<ulong> roleIds)
+    {
+        var relevantRoleIds = roleIds.Prepend(everyoneRoleId).Distinct().ToArray();
+        var permissions = relevantRoleIds
             .Where(roles.ContainsKey)
             .Select(roleId => roles[roleId].PermissionsRawValue)
             .Aggregate(0UL, static (combined, next) => combined | next);
 
         if ((permissions & (ulong)GuildPermission.Administrator) != 0)
-            return true;
+            return ulong.MaxValue;
 
-        permissions = ApplyEffectiveOverwrites(channel, channels, roleIds, permissions);
-        return (permissions & PermissionBit(ChannelPermission.ViewChannel)) != 0;
+        return ApplyEffectiveOverwrites(channel, channels, everyoneRoleId, roleIds, permissions);
     }
 
     private static ulong ApplyEffectiveOverwrites(
         ChannelSnapshot channel,
         IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        ulong everyoneRoleId,
         IReadOnlyList<ulong> roleIds,
         ulong permissions)
     {
         if (channel.ParentCategoryId is { } parentId
             && channels.TryGetValue(parentId, out var parentCategory))
         {
-            permissions = ApplyOverwrites(parentCategory, roleIds, permissions);
+            permissions = ApplyOverwrites(parentCategory, everyoneRoleId, roleIds, permissions);
         }
 
-        return ApplyOverwrites(channel, roleIds, permissions);
+        return ApplyOverwrites(channel, everyoneRoleId, roleIds, permissions);
     }
 
-    private static ulong ApplyOverwrites(ChannelSnapshot channel, IReadOnlyList<ulong> roleIds, ulong permissions)
+    private static ulong ApplyOverwrites(ChannelSnapshot channel, ulong everyoneRoleId, IReadOnlyList<ulong> roleIds, ulong permissions)
     {
-        var everyoneRoleId = roleIds[0];
         if (channel.FindRoleOverwrite(everyoneRoleId) is { } everyoneOverwrite)
         {
             permissions &= ~everyoneOverwrite.Deny;
@@ -472,7 +517,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         ulong combinedAllow = 0;
         ulong combinedDeny = 0;
 
-        foreach (var roleId in roleIds.Skip(1))
+        foreach (var roleId in roleIds)
         {
             if (channel.FindRoleOverwrite(roleId) is not { } roleOverwrite)
                 continue;
@@ -526,4 +571,6 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
     private sealed record PermissionOverwriteSnapshot(ulong Id, int Type, ulong Allow, ulong Deny);
 
     private sealed record RoleSnapshot(ulong Id, string Name, int Position, ulong PermissionsRawValue);
+
+    private sealed record BotStateSnapshot(IReadOnlyList<ulong> RoleIds, int HighestRolePosition, GuildPermissions GuildPermissions);
 }

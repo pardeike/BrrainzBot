@@ -114,6 +114,7 @@ Run `doctor` and check:
 - welcome channel ID
 - `#welcome` permissions on the channel or its parent category
 - role visibility rules
+- whether the bot can still send messages there
 
 ### New users can still post too early
 

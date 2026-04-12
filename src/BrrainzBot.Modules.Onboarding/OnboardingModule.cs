@@ -1,5 +1,6 @@
 using BrrainzBot.Host;
 using Discord;
+using Discord.Net;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
 
@@ -301,7 +302,18 @@ public sealed class OnboardingModule(
                 continue;
             }
 
-            await EnsureWelcomeMessageAsync(channel, serverSettings);
+            try
+            {
+                await EnsureWelcomeMessageAsync(channel, serverSettings);
+            }
+            catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.MissingPermissions)
+            {
+                logger.LogWarning(
+                    ex,
+                    "The bot cannot post in welcome channel {ChannelId} for server {ServerId}. Check the channel or parent-category Send Messages permission for the bot role.",
+                    serverSettings.WelcomeChannelId,
+                    serverSettings.ServerId);
+            }
         }
     }
 

@@ -134,6 +134,7 @@ Recommended `MEMBER` model:
 
 - `@everyone`: can view `#welcome`
 - `MEMBER`: cannot view `#welcome`
+- the bot itself: must still be able to post in `#welcome`
 
 That can be done on `#welcome` itself or on its parent category if the channel inherits from it.
 
