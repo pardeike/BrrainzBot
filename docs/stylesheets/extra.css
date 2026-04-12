@@ -23,7 +23,13 @@ body {
   font-family: "Montserrat", sans-serif;
   font-weight: 200;
   color: var(--bb-ink);
-  background: #ffffff;
+  background:
+    radial-gradient(circle at 14% 38rem, rgba(47, 111, 228, 0.035), rgba(47, 111, 228, 0) 22rem),
+    radial-gradient(circle at 86% 60rem, rgba(54, 193, 167, 0.04), rgba(54, 193, 167, 0) 19rem),
+    radial-gradient(circle at 18% 114rem, rgba(47, 111, 228, 0.025), rgba(47, 111, 228, 0) 22rem),
+    radial-gradient(circle at 84% 148rem, rgba(54, 193, 167, 0.03), rgba(54, 193, 167, 0) 18rem),
+    #ffffff;
+  background-repeat: no-repeat;
 }
 
 .md-typeset h1,
@@ -182,7 +188,7 @@ body {
   justify-content: center;
   gap: 0.55rem;
   min-height: 3.3rem;
-  padding: 0.8rem 1.25rem;
+  padding: 0.8rem 2.45rem;
   border-radius: 999px;
   border: 1px solid transparent;
   text-decoration: none !important;
@@ -311,8 +317,8 @@ body {
   width: min(15rem, 78%);
   padding: 1rem 1rem 1.05rem;
   border-radius: 1.35rem;
-  border: 1px solid rgba(113, 166, 230, 0.3);
-  background: linear-gradient(180deg, rgba(232, 243, 255, 0.98), rgba(255, 255, 255, 0.96));
+  border: 2px solid rgba(113, 166, 230, 0.42);
+  background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 22px 42px rgba(47, 111, 228, 0.16);
   color: var(--bb-ink-soft);
   transform: none;
@@ -451,14 +457,29 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 2.05rem;
+  height: 2.05rem;
   margin-bottom: 1rem;
   border-radius: 999px;
-  background: var(--bb-ink);
-  color: white;
+  border: 1px solid rgba(47, 111, 228, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 245, 255, 0.98));
+  color: var(--bb-blue);
   font-family: "Montserrat", sans-serif;
   font-weight: 600;
+  font-size: 1.05rem;
+  box-shadow: 0 10px 24px rgba(23, 50, 77, 0.08);
+}
+
+.step-card:nth-child(2) .step-number {
+  border-color: rgba(54, 193, 167, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(223, 245, 240, 0.98));
+  color: #1a8f78;
+}
+
+.step-card:nth-child(3) .step-number {
+  border-color: rgba(255, 141, 108, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 243, 232, 0.98));
+  color: #de6d4f;
 }
 
 .cta-panel {

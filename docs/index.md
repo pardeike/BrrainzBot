@@ -10,12 +10,12 @@ hide:
     <div class="hero-copy reveal">
       <div class="hero-kicker"><span></span>Self-hosted • Clear • Quiet</div>
       <h1 class="hero-anchor">
-        <span class="hero-line">Let people in.</span>
-        <span class="hero-line">Keep spam out.</span>
+        <span class="hero-line">Let people in</span>
+        <span class="hero-line">Keep spam out</span>
       </h1>
       <p class="lede">
-        BrrainzBot gives new users a readable first view, keeps verification out of public chat, and removes common spam patterns.
-        It is for Discord servers that want less noise and less setup friction.
+        BrrainzBot gives new users a readable first view, keeps checks out of public chat, and catches common spam early.
+        For Discord servers that want less noise and less setup friction.
       </p>
       <div class="hero-actions">
         <a class="bb-button primary" href="installation/">Install</a>
@@ -23,16 +23,16 @@ hide:
       </div>
       <div class="hero-points">
         <div class="hero-point">
-          <strong>Private verification</strong>
-          Buttons, modals, and ephemeral replies. No public welcome mess.
+          <strong>Private welcome</strong>
+          Buttons, short prompts, and private replies. No public welcome mess.
         </div>
         <div class="hero-point">
           <strong>Read-only preview</strong>
-          New users can look around before they can post.
+          New people can look around before they can post.
         </div>
         <div class="hero-point">
-          <strong>Manual updates</strong>
-          No background version checks. No silent changes.
+          <strong>No surprises</strong>
+          You choose when the bot changes.
         </div>
         <div class="hero-point hero-point-note">
           <strong>Good defaults</strong>
@@ -57,10 +57,10 @@ hide:
 
 <section class="bb-section reveal">
   <div class="section-heading">
-    <span class="eyebrow">What it does</span>
-    <h2>One bot. Multiple jobs.</h2>
+    <span class="eyebrow">At a glance</span>
+    <h2>One bot • Multiple jobs</h2>
     <p>
-      It handles entry and cleanup. New users verify in <code>#welcome</code>. SpamGuard removes honeypot and duplicate spam.
+      A calm welcome flow for real people • quick cleanup for common spam • clear setup when you need it.
     </p>
   </div>
   <div class="feature-grid">
@@ -68,36 +68,36 @@ hide:
       <div class="icon-badge blue">✦</div>
       <h3>Quiet onboarding</h3>
       <p>
-        New users start in <code>NEW</code>, can browse public channels in read-only mode, and verify through one welcome panel.
+        New people can look around before they can post, then pass through one clear welcome panel.
       </p>
       <ul>
-        <li>Persistent welcome post</li>
-        <li>Button + modal flow</li>
-        <li>Ephemeral replies only</li>
+        <li>One welcome post</li>
+        <li>Buttons and short prompts</li>
+        <li>Private replies only</li>
       </ul>
     </article>
     <article class="bb-card">
       <div class="icon-badge teal">✓</div>
-      <h3>Practical spam defense</h3>
+      <h3>Fast spam cleanup</h3>
       <p>
-        Honeypot triggers and cross-channel duplicate detection catch the common low-effort cases early.
+        Common spam bursts get caught early, before they turn the server noisy.
       </p>
       <ul>
-        <li>Honeypot trigger cleanup</li>
-        <li>Duplicate post detection</li>
-        <li>Per-guild configuration</li>
+        <li>Quick cleanup</li>
+        <li>Duplicate bursts caught</li>
+        <li>Rules per server</li>
       </ul>
     </article>
     <article class="bb-card">
       <div class="icon-badge coral">↺</div>
-      <h3>Simple operations</h3>
+      <h3>Calm upkeep</h3>
       <p>
-        Setup is guided. Reconfiguration is built in. Diagnostics are plain. Updates stay manual.
+        Easy to set up, easy to check, and quiet in day-to-day use.
       </p>
       <ul>
-        <li><code>setup</code> and <code>reconfigure</code></li>
-        <li><code>doctor</code> validation</li>
-        <li>Manual GitHub-backed updates</li>
+        <li>Guided setup</li>
+        <li>Health checks</li>
+        <li>Updates when you choose</li>
       </ul>
     </article>
   </div>
@@ -110,7 +110,7 @@ hide:
   <div class="story-copy">
     <div class="section-heading">
       <span class="eyebrow">Why it is built this way</span>
-      <h2>Start with the join moment.</h2>
+      <h2>Start with the join moment</h2>
       <p>
         Most bots start with commands and dashboards. This one starts with arrival. A real user should understand the server fast. A spammer should lose time fast.
       </p>
@@ -134,8 +134,8 @@ hide:
 
 <section class="bb-section reveal">
   <div class="section-heading">
-    <span class="eyebrow">How it works</span>
-    <h2>Setup in three steps.</h2>
+    <span class="eyebrow">Getting started</span>
+    <h2>Setup in three steps</h2>
     <p>
       You do not need to remember the Discord maze. Follow the same short path each time.
     </p>
@@ -143,20 +143,20 @@ hide:
   <div class="steps-grid">
     <article class="bb-card step-card">
       <div class="step-number">1</div>
-      <h3>Prepare the server</h3>
-      <p>Create <code>NEW</code>, <code>MEMBER</code>, and <code>#welcome</code>. Let new users browse, but grant normal participation through <code>MEMBER</code>.</p>
+      <h3>Shape the welcome path</h3>
+      <p>Create a welcome channel, a member role, and a calm first view for new people.</p>
       <a href="discord-setup/">Read the Discord setup guide →</a>
     </article>
     <article class="bb-card step-card">
       <div class="step-number">2</div>
       <h3>Run the wizard</h3>
-      <p>Use <code>brrainzbot setup</code> for the bot token, the AI endpoint, and your guild IDs. Use <code>reconfigure</code> later.</p>
+      <p>The setup wizard asks for your bot token, AI connection, and server details. You can change it later.</p>
       <a href="installation/">See installation →</a>
     </article>
     <article class="bb-card step-card">
       <div class="step-number">3</div>
-      <h3>Validate before go-live</h3>
-      <p>Run <code>brrainzbot doctor</code> to catch missing IDs, broken permissions, invalid tokens, and endpoint mistakes.</p>
+      <h3>Check before go-live</h3>
+      <p>Run a quick health check to catch missing permissions and setup mistakes.</p>
       <a href="operations/">See operations →</a>
     </article>
   </div>
@@ -166,19 +166,19 @@ hide:
   <div class="story-copy">
     <div class="section-heading">
       <span class="eyebrow">For self-hosters</span>
-      <h2>Local state. Explicit updates.</h2>
+      <h2>Local state • Explicit updates</h2>
       <p>
-        Config, state, and logs stay local. The bot checks GitHub only when you run the update command. If your setup changes, repair it in place.
+        Settings, logs, and state stay with you. Connect the AI service you want. Update the bot when you choose.
       </p>
     </div>
     <div class="split-grid">
       <div class="split-copy">
-        <h3>Safe endpoint setup</h3>
-        <p>OpenAI-compatible endpoints are configured directly. The docs keep the safe defaults clear.</p>
+        <h3>Safe AI setup</h3>
+        <p>Use OpenAI or a compatible service with clear defaults and clear docs.</p>
       </div>
       <div class="split-copy">
-        <h3>Phone-friendly release flow</h3>
-        <p>GitHub Actions handles builds, docs, and release packaging, so small fixes can move without a full desktop workflow.</p>
+        <h3>No hidden changes</h3>
+        <p>Nothing updates behind your back. The bot stays still until you ask.</p>
       </div>
     </div>
   </div>
@@ -190,9 +190,9 @@ hide:
 <section class="cta-panel reveal">
   <div class="section-heading">
     <span class="eyebrow">Start here</span>
-    <h2>Start with setup. Then leave it alone.</h2>
+    <h2>Start with setup • Then leave it alone</h2>
     <p>
-      If you are starting from zero, read the Discord setup guide. If you already have the IDs and token, go straight to installation.
+      Start with the Discord setup guide if you are beginning from scratch. If you already have the basics, go straight to installation.
     </p>
   </div>
   <div class="hero-actions">
