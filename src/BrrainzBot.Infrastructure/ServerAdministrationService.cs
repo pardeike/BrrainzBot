@@ -28,6 +28,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 EnsurePermission(server.CurrentUser.GuildPermissions.ManageChannels, "Manage Channels");
 
                 var everyoneRole = server.EveryoneRole;
+                var grantablePermissionsRaw = server.CurrentUser.GuildPermissions.RawValue;
                 var copyablePermissionsRaw = everyoneRole.Permissions.RawValue & server.CurrentUser.GuildPermissions.RawValue;
                 var skippedPermissions = DescribeGuildPermissions(everyoneRole.Permissions.RawValue & ~server.CurrentUser.GuildPermissions.RawValue);
                 var memberRole = ResolveMemberRole(server, serverSettings);
@@ -64,7 +65,21 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
 
                     if (everyoneOverwrite is { } overwrite)
                     {
-                        await channel.AddPermissionOverwriteAsync(memberRole, overwrite);
+                        var filteredOverwrite = new OverwritePermissions(
+                            overwrite.AllowValue & grantablePermissionsRaw,
+                            overwrite.DenyValue & grantablePermissionsRaw);
+
+                        try
+                        {
+                            await channel.AddPermissionOverwriteAsync(memberRole, filteredOverwrite);
+                        }
+                        catch (HttpException ex) when (IsMissingPermissions(ex))
+                        {
+                            throw new InvalidOperationException(
+                                $"Discord refused the MEMBER overwrite update for channel `{channel.Name}`. The usual causes are: the bot is missing Manage Channels in that server, the bot owner account needs 2FA for elevated permissions on this server, or the overwrite contains permissions the current bot install cannot manage.",
+                                ex);
+                        }
+
                         copiedOverwrites++;
                     }
                     else if (memberOverwrite.HasValue)
