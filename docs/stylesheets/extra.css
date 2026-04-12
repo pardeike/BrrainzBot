@@ -57,6 +57,35 @@ body {
   color: var(--bb-ink);
 }
 
+.md-header__button {
+  color: var(--bb-ink);
+}
+
+.md-header__button.md-icon {
+  margin: 0 0.15rem 0 0;
+  padding: 0.35rem;
+}
+
+.md-header__button.md-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: currentColor;
+}
+
+.md-header__button.md-logo {
+  margin: 0 0.2rem 0 0.15rem;
+  padding: 0.2rem;
+}
+
+.md-header__button.md-logo img {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.md-header__title {
+  margin-left: 0;
+}
+
 .md-main__inner {
   margin-top: 0.6rem;
 }
