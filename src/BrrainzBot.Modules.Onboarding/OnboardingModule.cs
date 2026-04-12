@@ -254,22 +254,17 @@ public sealed class OnboardingModule(
         var existing = messages.FirstOrDefault(m =>
             m.Author.Id == client.CurrentUser.Id &&
             m.Components.Any() &&
-            m.Embeds.Any(embed => string.Equals(embed.Title, serverSettings.Onboarding.WelcomeMessageTitle, StringComparison.Ordinal)));
+            (m.Embeds.Any(embed => string.Equals(embed.Title, serverSettings.Onboarding.WelcomeMessageTitle, StringComparison.Ordinal))
+             || string.Equals(m.Content, BuildWelcomeMessageContent(serverSettings), StringComparison.Ordinal)));
 
         if (existing != null)
             return;
-
-        var embed = new EmbedBuilder()
-            .WithTitle(serverSettings.Onboarding.WelcomeMessageTitle)
-            .WithDescription($"{serverSettings.Onboarding.WelcomeMessageBody}\n\n{serverSettings.Onboarding.RulesHint}")
-            .WithColor(new Color(77, 122, 255))
-            .Build();
 
         var component = new ComponentBuilder()
             .WithButton(serverSettings.Onboarding.StartButtonLabel, StartVerificationCustomId, ButtonStyle.Primary)
             .Build();
 
-        await channel.SendMessageAsync(embed: embed, components: component);
+        await channel.SendMessageAsync(text: BuildWelcomeMessageContent(serverSettings), components: component);
     }
 
     private async Task<VerificationSession> GetOrCreateSessionAsync(ulong serverId, IUser user, TimeSpan staleTimeout)
@@ -306,16 +301,19 @@ public sealed class OnboardingModule(
             {
                 await EnsureWelcomeMessageAsync(channel, serverSettings);
             }
-            catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.MissingPermissions)
+            catch (HttpException ex) when (ex.HttpCode == System.Net.HttpStatusCode.Forbidden || ex.DiscordCode == DiscordErrorCode.MissingPermissions)
             {
                 logger.LogWarning(
                     ex,
-                    "The bot cannot post in welcome channel {ChannelId} for server {ServerId}. Check the channel or parent-category Send Messages permission for the bot role.",
+                    "The bot cannot create the welcome prompt in channel {ChannelId} for server {ServerId}. Check the channel or parent-category posting permissions for the bot role.",
                     serverSettings.WelcomeChannelId,
                     serverSettings.ServerId);
             }
         }
     }
+
+    private static string BuildWelcomeMessageContent(ServerSettings serverSettings) =>
+        $"**{serverSettings.Onboarding.WelcomeMessageTitle}**\n{serverSettings.Onboarding.WelcomeMessageBody}\n\n{serverSettings.Onboarding.RulesHint}";
 
     private async Task RunMaintenanceLoopAsync(CancellationToken cancellationToken)
     {
