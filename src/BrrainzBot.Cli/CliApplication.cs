@@ -114,10 +114,10 @@ internal static class CliApplication
         AnsiConsole.MarkupLine($"  secrets: {Markup.Escape(paths.SecretsFilePath)}");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]Config[/]");
-        AnsiConsole.Write(new Panel(store.ToDisplayJson(settings)).Expand());
+        AnsiConsole.Write(new Panel(new Text(store.ToDisplayJson(settings))).Expand());
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]Secrets[/]");
-        AnsiConsole.Write(new Panel(System.Text.Json.JsonSerializer.Serialize(secrets.Redacted(), JsonDefaults.Options)).Expand());
+        AnsiConsole.Write(new Panel(new Text(System.Text.Json.JsonSerializer.Serialize(secrets.Redacted(), JsonDefaults.Options))).Expand());
         return 0;
     }
 

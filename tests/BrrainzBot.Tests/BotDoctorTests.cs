@@ -39,6 +39,51 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
+    public async Task DoctorExplainsLikelyCauseWhenGuildCannotBeReached()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(request =>
+        {
+            if (request.RequestUri?.AbsolutePath == "/api/v10/users/@me")
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+            if (request.RequestUri?.AbsolutePath == "/api/v10/guilds/123")
+                return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK);
+        }));
+
+        var settings = new BotSettings
+        {
+            Guilds =
+            [
+                new GuildSettings
+                {
+                    Name = "Test Guild",
+                    GuildId = 123,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 1000,
+                    OwnerUserId = 999,
+                    SpamGuard = new SpamGuardSettings
+                    {
+                        HoneypotChannelId = 654
+                    }
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        var message = Assert.Single(report.Messages, m => m.Code == "discord.guild.unreachable");
+        Assert.Contains("guild ID is wrong", message.Message);
+        Assert.Contains("invited", message.Message);
+    }
+
+    [Fact]
     public async Task DoctorExplainsWhenGuildIdIsUsedAsMemberRoleId()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory());
@@ -142,14 +187,14 @@ public sealed class BotDoctorTests
         return paths;
     }
 
-    private sealed class StubHttpClientFactory : IHttpClientFactory
+    private sealed class StubHttpClientFactory(Func<HttpRequestMessage, HttpResponseMessage>? responder = null) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new(new StubMessageHandler());
+        public HttpClient CreateClient(string name) => new(new StubMessageHandler(responder));
     }
 
-    private sealed class StubMessageHandler : HttpMessageHandler
+    private sealed class StubMessageHandler(Func<HttpRequestMessage, HttpResponseMessage>? responder) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+            => Task.FromResult(responder?.Invoke(request) ?? new HttpResponseMessage(System.Net.HttpStatusCode.OK));
     }
 }

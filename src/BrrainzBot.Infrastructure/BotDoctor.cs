@@ -85,7 +85,10 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         using var guildResponse = await client.GetAsync($"guilds/{guild.GuildId}", cancellationToken);
         if (!guildResponse.IsSuccessStatusCode)
         {
-            report.AddError("discord.guild.unreachable", $"{guild.Name}: the bot could not access the guild with ID {guild.GuildId}.");
+            report.AddError(
+                "discord.guild.unreachable",
+                $"{guild.Name}: the bot could not access the guild with ID {guild.GuildId} (HTTP {(int)guildResponse.StatusCode}). " +
+                "This usually means the guild ID is wrong, the bot has not been invited to that server, or it was removed.");
             return;
         }
 
