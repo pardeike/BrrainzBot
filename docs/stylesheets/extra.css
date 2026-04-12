@@ -232,7 +232,10 @@ body {
 }
 
 .hero-visual {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: stretch;
 }
 
 .hero-card,
@@ -284,10 +287,7 @@ body {
 }
 
 .hero-mini {
-  position: absolute;
-  bottom: 1.3rem;
-  left: -0.8rem;
-  max-width: 13rem;
+  max-width: 15rem;
   padding: 1rem 1rem 1.05rem;
   border-radius: 1.5rem;
   background: white;
@@ -480,19 +480,22 @@ body {
     background-size: 28rem 28rem, 22rem 22rem, 100% 34rem;
   }
 
-  .hero-grid,
   .story-grid,
   .split-grid,
   .feature-grid,
-  .steps-grid,
-  .hero-points {
+  .steps-grid {
     grid-template-columns: 1fr;
   }
 
   .hero-mini {
-    position: static;
-    margin-top: 1rem;
     max-width: none;
+  }
+}
+
+@media screen and (max-width: 64em) {
+  .hero-grid,
+  .hero-points {
+    grid-template-columns: 1fr;
   }
 }
 
