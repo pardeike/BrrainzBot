@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BrrainzBot.Host\BrrainzBot.Host.csproj" />
+    <ProjectReference Include="..\..\src\BrrainzBot.Infrastructure\BrrainzBot.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\BrrainzBot.Modules.Onboarding\BrrainzBot.Modules.Onboarding.csproj" />
+    <ProjectReference Include="..\..\src\BrrainzBot.Modules.SpamGuard\BrrainzBot.Modules.SpamGuard.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

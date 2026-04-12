@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BrrainzBot.Cli/BrrainzBot.Cli.csproj" />
+    <Project Path="src/BrrainzBot.Host/BrrainzBot.Host.csproj" />
+    <Project Path="src/BrrainzBot.Infrastructure/BrrainzBot.Infrastructure.csproj" />
+    <Project Path="src/BrrainzBot.Modules.Onboarding/BrrainzBot.Modules.Onboarding.csproj" />
+    <Project Path="src/BrrainzBot.Modules.SpamGuard/BrrainzBot.Modules.SpamGuard.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BrrainzBot.Tests/BrrainzBot.Tests.csproj" />
+  </Folder>
+</Solution>

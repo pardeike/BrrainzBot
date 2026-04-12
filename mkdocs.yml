@@ -1,0 +1,24 @@
+site_name: BrrainzBot
+site_description: Friendly Discord onboarding and spam defense
+site_url: https://ap.github.io/BrrainzBot/
+theme:
+  name: material
+  palette:
+    primary: blue
+    accent: teal
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Discord Setup: discord-setup.md
+  - Configuration: configuration.md
+  - OpenAI-Compatible Endpoints: openai-compatible.md
+  - Operations: operations.md
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true

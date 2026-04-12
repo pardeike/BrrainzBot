@@ -1,0 +1,245 @@
+using System.Diagnostics;
+using BrrainzBot.Host;
+using BrrainzBot.Infrastructure;
+using BrrainzBot.Modules.Onboarding;
+using BrrainzBot.Modules.SpamGuard;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Spectre.Console;
+
+namespace BrrainzBot.Cli;
+
+internal static class CliApplication
+{
+    public static async Task<int> RunAsync(string[] args)
+    {
+        var command = args.FirstOrDefault()?.ToLowerInvariant() ?? "help";
+        var remaining = args.Skip(1).ToArray();
+        var paths = ResolvePaths(remaining);
+
+        return command switch
+        {
+            "help" or "--help" or "-h" => ShowHelp(),
+            "setup" => await SetupAsync(paths, reconfigure: false),
+            "reconfigure" => await SetupAsync(paths, reconfigure: true),
+            "doctor" => await DoctorAsync(paths),
+            "print-config" => await PrintConfigAsync(paths),
+            "run" => await RunBotAsync(paths),
+            "self-update" => await SelfUpdateAsync(paths),
+            "__internal-apply-update" => await ApplyUpdateAsync(remaining),
+            _ => ShowUnknownCommand(command)
+        };
+    }
+
+    private static int ShowHelp()
+    {
+        AnsiConsole.Write(new FigletText("BrrainzBot").Color(Color.CornflowerBlue));
+        AnsiConsole.MarkupLine("[grey]Friendly Discord onboarding and spam defense.[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("Usage: [aqua]brrainzbot[/] <command> [grey][[--root path]][/]");
+        AnsiConsole.MarkupLine("Commands:");
+        AnsiConsole.MarkupLine("  [green]setup[/]         Create a fresh configuration with a guided wizard.");
+        AnsiConsole.MarkupLine("  [green]reconfigure[/]   Repair or change an existing configuration.");
+        AnsiConsole.MarkupLine("  [green]doctor[/]        Validate configuration, Discord IDs, and AI settings.");
+        AnsiConsole.MarkupLine("  [green]print-config[/]  Show the current configuration with secrets redacted.");
+        AnsiConsole.MarkupLine("  [green]run[/]           Start the bot.");
+        AnsiConsole.MarkupLine("  [green]self-update[/]   Fetch the latest release from GitHub after confirmation.");
+        return 0;
+    }
+
+    private static int ShowUnknownCommand(string command)
+    {
+        AnsiConsole.MarkupLine($"[red]Unknown command:[/] {Markup.Escape(command)}");
+        AnsiConsole.MarkupLine("Run [aqua]brrainzbot help[/] to see the available commands.");
+        return 1;
+    }
+
+    private static async Task<int> SetupAsync(AppPaths paths, bool reconfigure)
+    {
+        var store = new BotConfigurationStore();
+        var existing = store.Exists(paths)
+            ? await store.LoadAsync(paths, CancellationToken.None)
+            : ((BotSettings?)null, (RuntimeSecrets?)null);
+
+        if (reconfigure && existing.Item1 == null)
+        {
+            AnsiConsole.MarkupLine("[yellow]No existing configuration was found. Starting a fresh setup instead.[/]");
+        }
+
+        var result = SetupWizard.Run(existing.Item1, existing.Item2, paths);
+        await store.SaveAsync(paths, result.Settings, result.Secrets, CancellationToken.None);
+
+        AnsiConsole.MarkupLine($"[green]Saved configuration to[/] {Markup.Escape(paths.ConfigFilePath)}");
+        AnsiConsole.MarkupLine($"[green]Saved secrets to[/] {Markup.Escape(paths.SecretsFilePath)}");
+        AnsiConsole.MarkupLine("Next steps:");
+        AnsiConsole.MarkupLine("  1. Run [aqua]brrainzbot doctor[/] to validate the setup.");
+        AnsiConsole.MarkupLine("  2. Run [aqua]brrainzbot run[/] when you are ready.");
+        return 0;
+    }
+
+    private static async Task<int> DoctorAsync(AppPaths paths)
+    {
+        var (settings, secrets) = await LoadRequiredConfigurationAsync(paths);
+        var services = new ServiceCollection()
+            .AddBrrainzBotInfrastructure(settings, secrets, paths)
+            .BuildServiceProvider();
+
+        var doctor = services.GetRequiredService<BotDoctor>();
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+        var table = new Table().AddColumns("Severity", "Code", "Message");
+        foreach (var message in report.Messages)
+        {
+            var color = message.Severity switch
+            {
+                DiagnosticSeverity.Error => "red",
+                DiagnosticSeverity.Warning => "yellow",
+                _ => "grey"
+            };
+            table.AddRow($"[{color}]{message.Severity}[/]", Markup.Escape(message.Code), Markup.Escape(message.Message));
+        }
+
+        AnsiConsole.Write(table);
+        AnsiConsole.WriteLine();
+        if (report.HasErrors)
+        {
+            AnsiConsole.MarkupLine("[red]Doctor found blocking problems.[/]");
+            return 1;
+        }
+
+        AnsiConsole.MarkupLine("[green]Doctor finished without blocking problems.[/]");
+        return 0;
+    }
+
+    private static async Task<int> PrintConfigAsync(AppPaths paths)
+    {
+        var store = new BotConfigurationStore();
+        var (settings, secrets) = await store.LoadAsync(paths, CancellationToken.None);
+        AnsiConsole.MarkupLine("[green]Paths[/]");
+        AnsiConsole.MarkupLine($"  root: {Markup.Escape(paths.RootDirectory)}");
+        AnsiConsole.MarkupLine($"  config: {Markup.Escape(paths.ConfigFilePath)}");
+        AnsiConsole.MarkupLine($"  secrets: {Markup.Escape(paths.SecretsFilePath)}");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[green]Config[/]");
+        AnsiConsole.Write(new Panel(store.ToDisplayJson(settings)).Expand());
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[green]Secrets[/]");
+        AnsiConsole.Write(new Panel(System.Text.Json.JsonSerializer.Serialize(secrets.Redacted(), JsonDefaults.Options)).Expand());
+        return 0;
+    }
+
+    private static async Task<int> RunBotAsync(AppPaths paths)
+    {
+        var (settings, secrets) = await LoadRequiredConfigurationAsync(paths);
+
+        using var host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder()
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddSimpleConsole(options =>
+                {
+                    options.SingleLine = true;
+                    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss ";
+                });
+            })
+            .ConfigureServices(services =>
+            {
+                services.AddBrrainzBotInfrastructure(settings, secrets, paths);
+                if (settings.Guilds.Any(g => g.EnableOnboarding))
+                    services.AddOnboardingModule();
+                if (settings.Guilds.Any(g => g.EnableSpamGuard))
+                    services.AddSpamGuardModule();
+            })
+            .Build();
+
+        AnsiConsole.MarkupLine($"[green]Starting {Markup.Escape(settings.FriendlyName)} {Markup.Escape(BotMetadata.Version)}[/]");
+        await host.RunAsync();
+        return 0;
+    }
+
+    private static async Task<int> SelfUpdateAsync(AppPaths paths)
+    {
+        BotSettings settings;
+        try
+        {
+            (settings, _) = await LoadRequiredConfigurationAsync(paths);
+        }
+        catch
+        {
+            settings = new BotSettings();
+        }
+
+        var services = new ServiceCollection()
+            .AddBrrainzBotInfrastructure(settings, new RuntimeSecrets(), paths)
+            .BuildServiceProvider();
+
+        var updater = services.GetRequiredService<SelfUpdateService>();
+        var prepared = await updater.PrepareAsync(settings.Updates, CancellationToken.None);
+        if (prepared == null)
+        {
+            AnsiConsole.MarkupLine("[yellow]No matching release asset was found for this platform.[/]");
+            return 1;
+        }
+
+        AnsiConsole.MarkupLine($"Current version: [aqua]{Markup.Escape(BotMetadata.Version)}[/]");
+        AnsiConsole.MarkupLine($"Latest release: [aqua]{Markup.Escape(prepared.Release.TagName)}[/]");
+        AnsiConsole.MarkupLine($"Asset: [grey]{Markup.Escape(prepared.Asset.Name)}[/] ({prepared.Asset.SizeBytes / 1024d / 1024d:F1} MiB)");
+        AnsiConsole.Write(new Panel(prepared.Release.Body).Header("Release notes").Expand());
+
+        if (!AnsiConsole.Confirm("Download and replace the current binary?", defaultValue: false))
+            return 0;
+
+        var currentExecutable = Environment.ProcessPath ?? throw new InvalidOperationException("Could not resolve the current executable path.");
+        var helperExecutable = updater.CreateHelperExecutable(currentExecutable);
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = helperExecutable,
+            UseShellExecute = false
+        };
+        startInfo.ArgumentList.Add("__internal-apply-update");
+        startInfo.ArgumentList.Add(currentExecutable);
+        startInfo.ArgumentList.Add(prepared.ExtractedBinaryPath);
+        startInfo.ArgumentList.Add(Environment.ProcessId.ToString());
+
+        Process.Start(startInfo);
+        AnsiConsole.MarkupLine("[green]The updater helper has started. This process will now exit so the binary can be replaced.[/]");
+        return 0;
+    }
+
+    private static async Task<int> ApplyUpdateAsync(IReadOnlyList<string> args)
+    {
+        if (args.Count < 4)
+            return 1;
+
+        var targetExecutable = args[1];
+        var sourceExecutable = args[2];
+        _ = int.TryParse(args[3], out var waitForProcessId);
+        var paths = AppPaths.CreateDefault();
+        var services = new ServiceCollection()
+            .AddBrrainzBotInfrastructure(new BotSettings(), new RuntimeSecrets(), paths)
+            .BuildServiceProvider();
+        var updater = services.GetRequiredService<SelfUpdateService>();
+        await updater.ApplyAsync(targetExecutable, sourceExecutable, waitForProcessId, CancellationToken.None);
+        return 0;
+    }
+
+    private static async Task<(BotSettings Settings, RuntimeSecrets Secrets)> LoadRequiredConfigurationAsync(AppPaths paths)
+    {
+        var store = new BotConfigurationStore();
+        if (!store.Exists(paths))
+            throw new FileNotFoundException("Run `brrainzbot setup` before using this command.");
+
+        return await store.LoadAsync(paths, CancellationToken.None);
+    }
+
+    private static AppPaths ResolvePaths(string[] args)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (string.Equals(args[i], "--root", StringComparison.Ordinal))
+                return AppPaths.FromRoot(args[i + 1]);
+        }
+
+        return AppPaths.CreateDefault();
+    }
+}
