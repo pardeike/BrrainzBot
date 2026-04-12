@@ -57,6 +57,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
 
                 var copiedOverwrites = 0;
                 var removedOverwrites = 0;
+                var skippedChannels = new List<string>();
 
                 foreach (var channel in server.Channels.Where(channel => channel is not SocketThreadChannel))
                 {
@@ -72,20 +73,34 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                         try
                         {
                             await channel.AddPermissionOverwriteAsync(memberRole, filteredOverwrite);
+                            copiedOverwrites++;
                         }
                         catch (HttpException ex) when (IsMissingPermissions(ex))
                         {
-                            throw new InvalidOperationException(
-                                $"Discord refused the MEMBER overwrite update for channel `{channel.Name}`. The usual causes are: the bot is missing Manage Channels in that server, the bot owner account needs 2FA for elevated permissions on this server, or the overwrite contains permissions the current bot install cannot manage.",
-                                ex);
+                            skippedChannels.Add(channel.Name);
+                            logger.LogWarning(
+                                ex,
+                                "Skipping MEMBER overwrite copy for channel {ChannelName} in server {ServerId}",
+                                channel.Name,
+                                server.Id);
                         }
-
-                        copiedOverwrites++;
                     }
                     else if (memberOverwrite.HasValue)
                     {
-                        await channel.RemovePermissionOverwriteAsync(memberRole);
-                        removedOverwrites++;
+                        try
+                        {
+                            await channel.RemovePermissionOverwriteAsync(memberRole);
+                            removedOverwrites++;
+                        }
+                        catch (HttpException ex) when (IsMissingPermissions(ex))
+                        {
+                            skippedChannels.Add(channel.Name);
+                            logger.LogWarning(
+                                ex,
+                                "Skipping MEMBER overwrite removal for channel {ChannelName} in server {ServerId}",
+                                channel.Name,
+                                server.Id);
+                        }
                     }
                 }
 
@@ -98,7 +113,8 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     previousRoleId != memberRole.Id,
                     copiedOverwrites,
                     removedOverwrites,
-                    skippedPermissions);
+                    skippedPermissions,
+                    skippedChannels);
             }, cancellationToken);
         }
         catch (HttpException ex) when (IsMissingPermissions(ex))
@@ -317,7 +333,8 @@ public sealed record CreateMemberRoleResult(
     bool UpdatedConfig,
     int CopiedChannelOverrides,
     int RemovedChannelOverrides,
-    IReadOnlyList<string> SkippedServerPermissions);
+    IReadOnlyList<string> SkippedServerPermissions,
+    IReadOnlyList<string> SkippedChannels);
 
 public sealed record SetMembersResult(
     string ServerName,
