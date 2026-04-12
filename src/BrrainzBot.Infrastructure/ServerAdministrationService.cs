@@ -53,11 +53,19 @@ public sealed class ServerAdministrationService(
                 }
                 else
                 {
-                    await memberRole.ModifyAsync(properties =>
+                    var currentPermissionsRaw = memberRole.Permissions.RawValue;
+                    var targetPermissionsRaw = (currentPermissionsRaw & ~grantablePermissionsRaw) | copyablePermissionsRaw;
+                    var needsRename = !string.Equals(memberRole.Name, "MEMBER", StringComparison.Ordinal);
+                    var needsPermissionSync = currentPermissionsRaw != targetPermissionsRaw;
+
+                    if (needsRename || needsPermissionSync)
                     {
-                        properties.Name = "MEMBER";
-                        properties.Permissions = new GuildPermissions(copyablePermissionsRaw);
-                    });
+                        await memberRole.ModifyAsync(properties =>
+                        {
+                            properties.Name = "MEMBER";
+                            properties.Permissions = new GuildPermissions(targetPermissionsRaw);
+                        });
+                    }
                 }
 
                 var copiedOverwrites = 0;
@@ -71,14 +79,20 @@ public sealed class ServerAdministrationService(
 
                     if (everyoneOverwrite is { } overwrite)
                     {
-                        var filteredOverwrite = new OverwritePermissions(
-                            overwrite.AllowValue & grantablePermissionsRaw,
-                            overwrite.DenyValue & grantablePermissionsRaw);
+                        var currentAllow = memberOverwrite?.AllowValue ?? 0;
+                        var currentDeny = memberOverwrite?.DenyValue ?? 0;
+                        var preservedAllow = currentAllow & ~grantablePermissionsRaw;
+                        var preservedDeny = currentDeny & ~grantablePermissionsRaw;
+                        var targetAllow = preservedAllow | (overwrite.AllowValue & grantablePermissionsRaw);
+                        var targetDeny = preservedDeny | (overwrite.DenyValue & grantablePermissionsRaw);
 
                         try
                         {
-                            await channel.AddPermissionOverwriteAsync(memberRole, filteredOverwrite);
-                            copiedOverwrites++;
+                            if (currentAllow != targetAllow || currentDeny != targetDeny)
+                            {
+                                await channel.AddPermissionOverwriteAsync(memberRole, new OverwritePermissions(targetAllow, targetDeny));
+                                copiedOverwrites++;
+                            }
                         }
                         catch (HttpException ex) when (IsMissingPermissions(ex))
                         {
@@ -92,10 +106,22 @@ public sealed class ServerAdministrationService(
                     }
                     else if (memberOverwrite.HasValue)
                     {
+                        var currentAllow = memberOverwrite.Value.AllowValue;
+                        var currentDeny = memberOverwrite.Value.DenyValue;
+                        var targetAllow = currentAllow & ~grantablePermissionsRaw;
+                        var targetDeny = currentDeny & ~grantablePermissionsRaw;
+
                         try
                         {
-                            await channel.RemovePermissionOverwriteAsync(memberRole);
-                            removedOverwrites++;
+                            if (targetAllow == 0 && targetDeny == 0)
+                            {
+                                await channel.RemovePermissionOverwriteAsync(memberRole);
+                                removedOverwrites++;
+                            }
+                            else if (currentAllow != targetAllow || currentDeny != targetDeny)
+                            {
+                                await channel.AddPermissionOverwriteAsync(memberRole, new OverwritePermissions(targetAllow, targetDeny));
+                            }
                         }
                         catch (HttpException ex) when (IsMissingPermissions(ex))
                         {
