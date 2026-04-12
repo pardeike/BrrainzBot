@@ -1,8 +1,10 @@
 using BrrainzBot.Host;
 using Discord;
+using Discord.Net;
 using Discord.Rest;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace BrrainzBot.Infrastructure;
 
@@ -15,69 +17,76 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
     {
         var serverSettings = ResolveServer(settings, requestedServerId);
 
-        return await WithConnectedClientAsync(async client =>
+        try
         {
-            var server = client.GetGuild(serverSettings.ServerId)
-                ?? throw new InvalidOperationException($"The bot cannot access server {serverSettings.ServerId}. Check the invite and the server ID.");
-
-            EnsurePermission(server.CurrentUser.GuildPermissions.ManageRoles, "Manage Roles");
-            EnsurePermission(server.CurrentUser.GuildPermissions.ManageChannels, "Manage Channels");
-
-            var everyoneRole = server.EveryoneRole;
-            var memberRole = ResolveMemberRole(server, serverSettings);
-            var createdRole = false;
-            var previousRoleId = serverSettings.MemberRoleId;
-
-            if (memberRole == null)
+            return await WithConnectedClientAsync(async client =>
             {
-                var created = await server.CreateRoleAsync(
-                    "MEMBER",
-                    everyoneRole.Permissions,
-                    color: null,
-                    isHoisted: false,
-                    isMentionable: false);
-                memberRole = server.GetRole(created.Id) ?? (IRole)created;
-                createdRole = true;
-            }
-            else
-            {
-                await memberRole.ModifyAsync(properties =>
+                var server = client.GetGuild(serverSettings.ServerId)
+                    ?? throw new InvalidOperationException($"The bot cannot access server {serverSettings.ServerId}. Check the invite and the server ID.");
+
+                EnsurePermission(server.CurrentUser.GuildPermissions.ManageRoles, "Manage Roles");
+                EnsurePermission(server.CurrentUser.GuildPermissions.ManageChannels, "Manage Channels");
+
+                var everyoneRole = server.EveryoneRole;
+                var memberRole = ResolveMemberRole(server, serverSettings);
+                var createdRole = false;
+                var previousRoleId = serverSettings.MemberRoleId;
+
+                if (memberRole == null)
                 {
-                    properties.Name = "MEMBER";
-                    properties.Permissions = everyoneRole.Permissions;
-                });
-            }
-
-            var copiedOverwrites = 0;
-            var removedOverwrites = 0;
-
-            foreach (var channel in server.Channels.Where(channel => channel is not SocketThreadChannel))
-            {
-                var everyoneOverwrite = channel.GetPermissionOverwrite(everyoneRole);
-                var memberOverwrite = channel.GetPermissionOverwrite(memberRole);
-
-                if (everyoneOverwrite is { } overwrite)
-                {
-                    await channel.AddPermissionOverwriteAsync(memberRole, overwrite);
-                    copiedOverwrites++;
+                    var created = await server.CreateRoleAsync(
+                        "MEMBER",
+                        everyoneRole.Permissions,
+                        color: null,
+                        isHoisted: false,
+                        isMentionable: false);
+                    memberRole = server.GetRole(created.Id) ?? (IRole)created;
+                    createdRole = true;
                 }
-                else if (memberOverwrite.HasValue)
+                else
                 {
-                    await channel.RemovePermissionOverwriteAsync(memberRole);
-                    removedOverwrites++;
+                    await memberRole.ModifyAsync(properties =>
+                    {
+                        properties.Name = "MEMBER";
+                        properties.Permissions = everyoneRole.Permissions;
+                    });
                 }
-            }
 
-            return new CreateMemberRoleResult(
-                serverSettings.Name,
-                serverSettings.ServerId,
-                previousRoleId,
-                memberRole.Id,
-                createdRole,
-                previousRoleId != memberRole.Id,
-                copiedOverwrites,
-                removedOverwrites);
-        }, cancellationToken);
+                var copiedOverwrites = 0;
+                var removedOverwrites = 0;
+
+                foreach (var channel in server.Channels.Where(channel => channel is not SocketThreadChannel))
+                {
+                    var everyoneOverwrite = channel.GetPermissionOverwrite(everyoneRole);
+                    var memberOverwrite = channel.GetPermissionOverwrite(memberRole);
+
+                    if (everyoneOverwrite is { } overwrite)
+                    {
+                        await channel.AddPermissionOverwriteAsync(memberRole, overwrite);
+                        copiedOverwrites++;
+                    }
+                    else if (memberOverwrite.HasValue)
+                    {
+                        await channel.RemovePermissionOverwriteAsync(memberRole);
+                        removedOverwrites++;
+                    }
+                }
+
+                return new CreateMemberRoleResult(
+                    serverSettings.Name,
+                    serverSettings.ServerId,
+                    previousRoleId,
+                    memberRole.Id,
+                    createdRole,
+                    previousRoleId != memberRole.Id,
+                    copiedOverwrites,
+                    removedOverwrites);
+            }, cancellationToken);
+        }
+        catch (HttpException ex) when (IsMissingPermissions(ex))
+        {
+            throw new InvalidOperationException(BuildMissingPermissionsHint("create-member"), ex);
+        }
     }
 
     public async Task<SetMembersResult> SetMembersAsync(
@@ -89,70 +98,77 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
         if (serverSettings.MemberRoleId == 0 || serverSettings.UsesEveryoneAsMemberState)
             throw new InvalidOperationException("This server does not have a real MEMBER role configured. Run `brrainzbot create-member` first.");
 
-        return await WithConnectedClientAsync(async client =>
+        try
         {
-            var server = client.GetGuild(serverSettings.ServerId)
-                ?? throw new InvalidOperationException($"The bot cannot access server {serverSettings.ServerId}. Check the invite and the server ID.");
-
-            EnsurePermission(server.CurrentUser.GuildPermissions.ManageRoles, "Manage Roles");
-
-            var memberRole = server.GetRole(serverSettings.MemberRoleId)
-                ?? throw new InvalidOperationException("The configured MEMBER role does not exist on the server. Run `brrainzbot create-member` first.");
-
-            await server.DownloadUsersAsync();
-
-            var checkedMembers = 0;
-            var botsSkipped = 0;
-            var alreadyHadMember = 0;
-            var newUsersSkipped = 0;
-            var added = 0;
-            var failed = 0;
-
-            foreach (var member in server.Users.OrderBy(member => member.Id))
+            return await WithConnectedClientAsync(async client =>
             {
-                if (member.IsBot)
+                var server = client.GetGuild(serverSettings.ServerId)
+                    ?? throw new InvalidOperationException($"The bot cannot access server {serverSettings.ServerId}. Check the invite and the server ID.");
+
+                EnsurePermission(server.CurrentUser.GuildPermissions.ManageRoles, "Manage Roles");
+
+                var memberRole = server.GetRole(serverSettings.MemberRoleId)
+                    ?? throw new InvalidOperationException("The configured MEMBER role does not exist on the server. Run `brrainzbot create-member` first.");
+
+                await server.DownloadUsersAsync();
+
+                var checkedMembers = 0;
+                var botsSkipped = 0;
+                var alreadyHadMember = 0;
+                var newUsersSkipped = 0;
+                var added = 0;
+                var failed = 0;
+
+                foreach (var member in server.Users.OrderBy(member => member.Id))
                 {
-                    botsSkipped++;
-                    continue;
+                    if (member.IsBot)
+                    {
+                        botsSkipped++;
+                        continue;
+                    }
+
+                    checkedMembers++;
+
+                    if (member.Roles.Any(role => role.Id == memberRole.Id))
+                    {
+                        alreadyHadMember++;
+                        continue;
+                    }
+
+                    if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
+                    {
+                        newUsersSkipped++;
+                        continue;
+                    }
+
+                    try
+                    {
+                        await member.AddRoleAsync(memberRole);
+                        added++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        logger.LogWarning(ex, "Failed to add MEMBER to user {UserId} in server {ServerId}", member.Id, server.Id);
+                    }
                 }
 
-                checkedMembers++;
-
-                if (member.Roles.Any(role => role.Id == memberRole.Id))
-                {
-                    alreadyHadMember++;
-                    continue;
-                }
-
-                if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
-                {
-                    newUsersSkipped++;
-                    continue;
-                }
-
-                try
-                {
-                    await member.AddRoleAsync(memberRole);
-                    added++;
-                }
-                catch (Exception ex)
-                {
-                    failed++;
-                    logger.LogWarning(ex, "Failed to add MEMBER to user {UserId} in server {ServerId}", member.Id, server.Id);
-                }
-            }
-
-            return new SetMembersResult(
-                serverSettings.Name,
-                serverSettings.ServerId,
-                memberRole.Id,
-                checkedMembers,
-                botsSkipped,
-                alreadyHadMember,
-                newUsersSkipped,
-                added,
-                failed);
-        }, cancellationToken);
+                return new SetMembersResult(
+                    serverSettings.Name,
+                    serverSettings.ServerId,
+                    memberRole.Id,
+                    checkedMembers,
+                    botsSkipped,
+                    alreadyHadMember,
+                    newUsersSkipped,
+                    added,
+                    failed);
+            }, cancellationToken);
+        }
+        catch (HttpException ex) when (IsMissingPermissions(ex))
+        {
+            throw new InvalidOperationException(BuildMissingPermissionsHint("set-members"), ex);
+        }
     }
 
     private static ServerSettings ResolveServer(BotSettings settings, ulong? requestedServerId)
@@ -188,6 +204,12 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
         if (!allowed)
             throw new InvalidOperationException($"The bot needs `{permissionName}` on this server for this command.");
     }
+
+    private static bool IsMissingPermissions(HttpException ex) =>
+        ex.HttpCode == HttpStatusCode.Forbidden || ex.DiscordCode == DiscordErrorCode.MissingPermissions;
+
+    private static string BuildMissingPermissionsHint(string commandName) =>
+        $"Discord returned Missing Permissions during `{commandName}`. The usual causes are: the bot role is below NEW or MEMBER, the bot is missing Manage Roles or Manage Channels, or the server has server-wide 2FA enabled and the bot owner account does not have 2FA enabled.";
 
     private async Task<TResult> WithConnectedClientAsync<TResult>(
         Func<DiscordSocketClient, Task<TResult>> action,
