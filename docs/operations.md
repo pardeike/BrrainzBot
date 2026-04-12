@@ -42,6 +42,8 @@ What they do:
 - `create-member` creates or fixes a real `MEMBER` role and copies the current `@everyone` channel/category overrides to it
 - `set-members` gives that `MEMBER` role to existing non-bot users who are not in active onboarding
 
+Onboarding itself is not optional. Spam cleanup is.
+
 Run `create-member` first. Then run `set-members`. Only after that should you remove normal member permissions from `@everyone`.
 
 `create-member` needs both `Manage Roles` and `Manage Channels` on the Discord server.

@@ -47,6 +47,7 @@ Setup asks for:
 - your Discord bot token
 - your AI endpoint and model
 - one server at a time
+- whether spam cleanup should be on for that server
 
 Safe default:
 

@@ -149,7 +149,9 @@ public sealed class ServerAdministrationService(
 
                 var memberRole = server.GetRole(serverSettings.MemberRoleId)
                     ?? throw new InvalidOperationException("The configured MEMBER role does not exist on the server. Run `brrainzbot create-member` first.");
+                var now = DateTimeOffset.UtcNow;
                 var activeOnboardingUserIds = (await sessionStore.ListAsync(cancellationToken))
+                    .Where(session => session.ExpiresAt > now)
                     .Where(session => session.ServerId == serverSettings.ServerId)
                     .Select(session => session.UserId)
                     .ToHashSet();

@@ -13,7 +13,7 @@ The setup wizard writes both for you.
 - GitHub repository used for self-update
 - AI endpoint base URL and model
 - per-server IDs
-- per-server feature toggles
+- per-server active state and spam toggle
 - onboarding text and limits
 - spam cleanup settings
 
@@ -42,7 +42,7 @@ Each server has its own:
 - `MEMBER` role ID
 - owner user ID
 - server topic prompt
-- feature toggles
+- spam cleanup on or off
 
 ## Recommended Role Model
 
@@ -51,6 +51,8 @@ Use one real `MEMBER` role:
 - `@everyone` is the baseline
 - `MEMBER` grants normal posting
 - people without `MEMBER` stay in the welcome path until approval
+
+This is the bot's core model. There is no second newcomer role anymore.
 
 If your server already uses `@everyone` for normal posting, use:
 

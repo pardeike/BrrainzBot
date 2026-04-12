@@ -37,7 +37,6 @@ public sealed class ServerSettings
     public ulong WelcomeChannelId { get; init; }
     public ulong MemberRoleId { get; init; }
     public ulong OwnerUserId { get; init; }
-    public bool EnableOnboarding { get; init; } = true;
     public bool EnableSpamGuard { get; init; } = true;
     public string ServerTopicPrompt { get; init; } = string.Empty;
     public List<ulong> PublicReadOnlyChannelIds { get; init; } = [];

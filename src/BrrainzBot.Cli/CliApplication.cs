@@ -41,7 +41,7 @@ internal static class CliApplication
     private static int ShowHelp()
     {
         AnsiConsole.Write(new FigletText("BrrainzBot").Color(Color.CornflowerBlue));
-        AnsiConsole.MarkupLine("[grey]Friendly Discord onboarding and spam defense.[/]");
+        AnsiConsole.MarkupLine("[grey]Discord onboarding and optional spam defense.[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("Usage: [aqua]brrainzbot[/] <command> [grey][[--root path]][/]");
         AnsiConsole.MarkupLine("Commands:");
@@ -116,7 +116,7 @@ internal static class CliApplication
                 Markup.Escape(server.Name),
                 server.ServerId.ToString(),
                 server.IsActive ? "[green]on[/]" : "[yellow]off[/]",
-                server.EnableOnboarding ? "[green]on[/]" : "[grey]off[/]",
+                "[green]core[/]",
                 server.EnableSpamGuard ? "[green]on[/]" : "[grey]off[/]");
         }
 
@@ -368,8 +368,7 @@ internal static class CliApplication
             .ConfigureServices(services =>
             {
                 services.AddBrrainzBotInfrastructure(settings, secrets, paths);
-                if (settings.Servers.Any(s => s.EnableOnboarding))
-                    services.AddOnboardingModule();
+                services.AddOnboardingModule();
                 if (settings.Servers.Any(s => s.EnableSpamGuard))
                     services.AddSpamGuardModule();
             })
@@ -561,7 +560,6 @@ internal static class CliApplication
             WelcomeChannelId = server.WelcomeChannelId,
             MemberRoleId = server.MemberRoleId,
             OwnerUserId = server.OwnerUserId,
-            EnableOnboarding = server.EnableOnboarding,
             EnableSpamGuard = server.EnableSpamGuard,
             ServerTopicPrompt = server.ServerTopicPrompt,
             PublicReadOnlyChannelIds = [.. server.PublicReadOnlyChannelIds],
@@ -599,7 +597,6 @@ internal static class CliApplication
             WelcomeChannelId = server.WelcomeChannelId,
             MemberRoleId = memberRoleId,
             OwnerUserId = server.OwnerUserId,
-            EnableOnboarding = server.EnableOnboarding,
             EnableSpamGuard = server.EnableSpamGuard,
             ServerTopicPrompt = server.ServerTopicPrompt,
             PublicReadOnlyChannelIds = [.. server.PublicReadOnlyChannelIds],

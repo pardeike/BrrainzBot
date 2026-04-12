@@ -117,7 +117,6 @@ public sealed class BotConfigurationStore
         public ulong NewRoleId { get; init; }
         public ulong MemberRoleId { get; init; }
         public ulong OwnerUserId { get; init; }
-        public bool EnableOnboarding { get; init; } = true;
         public bool EnableSpamGuard { get; init; } = true;
         public string GuildTopicPrompt { get; init; } = string.Empty;
         public List<ulong> PublicReadOnlyChannelIds { get; init; } = [];
@@ -132,7 +131,6 @@ public sealed class BotConfigurationStore
             WelcomeChannelId = WelcomeChannelId,
             MemberRoleId = MemberRoleId,
             OwnerUserId = OwnerUserId,
-            EnableOnboarding = EnableOnboarding,
             EnableSpamGuard = EnableSpamGuard,
             ServerTopicPrompt = GuildTopicPrompt,
             PublicReadOnlyChannelIds = [.. PublicReadOnlyChannelIds],

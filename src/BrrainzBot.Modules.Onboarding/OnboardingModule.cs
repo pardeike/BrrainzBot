@@ -40,7 +40,7 @@ public sealed class OnboardingModule(
     private async Task HandleUserJoinedAsync(SocketGuildUser user)
     {
         var serverSettings = FindActiveServerSettings(user.Guild.Id);
-        if (serverSettings is not { EnableOnboarding: true })
+        if (serverSettings == null)
             return;
         var session = new VerificationSession
         {
@@ -69,7 +69,7 @@ public sealed class OnboardingModule(
             return;
 
         var serverSettings = FindActiveServerSettings(serverId);
-        if (serverSettings is not { EnableOnboarding: true })
+        if (serverSettings == null)
             return;
 
         var session = await GetOrCreateSessionAsync(serverId, component.User, serverSettings.Onboarding.StaleTimeout);
@@ -109,7 +109,7 @@ public sealed class OnboardingModule(
             return;
 
         var serverSettings = FindActiveServerSettings(serverId);
-        if (serverSettings is not { EnableOnboarding: true })
+        if (serverSettings == null)
             return;
 
         var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
@@ -282,7 +282,7 @@ public sealed class OnboardingModule(
 
     private async Task SyncWelcomeMessagesAsync()
     {
-        foreach (var serverSettings in settingsProvider.Current.Servers.Where(s => s.IsActive && s.EnableOnboarding))
+        foreach (var serverSettings in settingsProvider.Current.Servers.Where(s => s.IsActive))
         {
             var server = client.GetGuild(serverSettings.ServerId);
             if (server == null)

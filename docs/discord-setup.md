@@ -122,6 +122,8 @@ If your server already uses `@everyone` for normal posting, BrrainzBot can help 
 ./brrainzbot set-members <serverId>
 ```
 
+Use those helper commands after `setup` and `doctor`, not before your first local install.
+
 ## 9. Create `#welcome`
 
 Create a channel called `#welcome`.

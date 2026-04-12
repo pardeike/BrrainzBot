@@ -2,7 +2,7 @@
 
 <img src="docs/assets/illustrations/fluffy-bot.png" alt="BrrainzBot robot" width="120" align="right">
 
-BrrainzBot is a self-hosted Discord bot for two jobs:
+BrrainzBot is a self-hosted Discord bot with one core job and one optional one:
 
 - let real people in without public welcome clutter
 - clean up common spam before it spreads
@@ -29,6 +29,7 @@ brrainzbot invite-url
 
 ### Onboarding
 
+- this is the core feature
 - keeps the welcome flow inside `#welcome`
 - uses one persistent welcome post, a button, and short prompts
 - replies privately instead of cluttering public chat
@@ -36,6 +37,7 @@ brrainzbot invite-url
 
 ### Spam cleanup
 
+- optional per server
 - watches a honeypot channel
 - catches near-duplicate spam bursts
 - deletes spam around the trigger window

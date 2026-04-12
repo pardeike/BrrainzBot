@@ -340,7 +340,8 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
     private static async Task<Dictionary<ulong, HashSet<ulong>>> LoadActiveSessionsByServerAsync(AppPaths paths, CancellationToken cancellationToken)
     {
         var store = new JsonVerificationSessionStore(paths);
-        var sessions = await store.ListAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        var sessions = (await store.ListAsync(cancellationToken)).Where(session => session.ExpiresAt > now);
         return sessions
             .GroupBy(session => session.ServerId)
             .ToDictionary(group => group.Key, group => group.Select(session => session.UserId).ToHashSet());

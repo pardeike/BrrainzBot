@@ -97,8 +97,7 @@ internal static class SetupWizard
 
         EditIdentityAndActivation(draft);
         EditDiscordIdsAndRoles(draft);
-        if (draft.EnableOnboarding)
-            EditOnboarding(draft);
+        EditOnboarding(draft);
         if (draft.EnableSpamGuard)
             EditSpamGuard(draft);
 
@@ -149,7 +148,6 @@ internal static class SetupWizard
             draft.OwnerUserId,
             "This should be your own Discord user ID.");
         draft.IsActive = AskConfirmation("Turn this server on now?", draft.IsActive);
-        draft.EnableOnboarding = AskConfirmation("Turn on onboarding for this server?", draft.EnableOnboarding);
         draft.EnableSpamGuard = AskConfirmation("Turn on spam cleanup for this server?", draft.EnableSpamGuard);
     }
 
@@ -201,7 +199,7 @@ internal static class SetupWizard
         table.AddRow("Name", Markup.Escape(draft.Name));
         table.AddRow("Server ID", draft.ServerId == 0 ? "[red]missing[/]" : draft.ServerId.ToString());
         table.AddRow("Active", draft.IsActive ? "[green]on[/]" : "[yellow]off[/]");
-        table.AddRow("Onboarding", draft.EnableOnboarding ? "[green]on[/]" : "[grey]off[/]");
+        table.AddRow("Onboarding", "[green]core[/]");
         table.AddRow("Spam cleanup", draft.EnableSpamGuard ? "[green]on[/]" : "[grey]off[/]");
         table.AddRow("Welcome channel ID", draft.WelcomeChannelId == 0 ? "[red]missing[/]" : draft.WelcomeChannelId.ToString());
         table.AddRow("MEMBER role ID", draft.MemberRoleId == 0 ? "[red]missing[/]" : draft.MemberRoleId.ToString());
@@ -284,7 +282,6 @@ internal static class SetupWizard
         public ulong WelcomeChannelId { get; set; }
         public ulong MemberRoleId { get; set; }
         public ulong OwnerUserId { get; set; }
-        public bool EnableOnboarding { get; set; } = true;
         public bool EnableSpamGuard { get; set; } = true;
         public string ServerTopicPrompt { get; set; } =
             "This server is for real people who want to take part in this community. Reject spam, scams, and obvious wrong-server arrivals.";
@@ -320,7 +317,6 @@ internal static class SetupWizard
                 WelcomeChannelId = existing.WelcomeChannelId,
                 MemberRoleId = existing.MemberRoleId != 0 && existing.MemberRoleId != existing.ServerId ? existing.MemberRoleId : 0,
                 OwnerUserId = existing.OwnerUserId,
-                EnableOnboarding = existing.EnableOnboarding,
                 EnableSpamGuard = existing.EnableSpamGuard,
                 ServerTopicPrompt = existing.ServerTopicPrompt,
                 PublicReadOnlyChannelIds = [.. existing.PublicReadOnlyChannelIds],
@@ -352,7 +348,6 @@ internal static class SetupWizard
             WelcomeChannelId = WelcomeChannelId,
             MemberRoleId = MemberRoleId,
             OwnerUserId = OwnerUserId,
-            EnableOnboarding = EnableOnboarding,
             EnableSpamGuard = EnableSpamGuard,
             ServerTopicPrompt = ServerTopicPrompt,
             PublicReadOnlyChannelIds = [.. PublicReadOnlyChannelIds],

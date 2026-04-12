@@ -331,6 +331,44 @@ public sealed class BotDoctorTests
         Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.memberrole.backfill_needed");
     }
 
+    [Fact]
+    public async Task DoctorDoesNotTreatExpiredSessionsAsActiveOnboarding()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            memberPages:
+            [
+                """
+                [
+                  {
+                    "user": { "id": "2001", "bot": false },
+                    "roles": []
+                  }
+                ]
+                """
+            ])));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithSessions(new VerificationSession
+        {
+            ServerId = 123,
+            UserId = 2001,
+            UserName = "expired-user",
+            JoinedAt = DateTimeOffset.UtcNow.AddDays(-2),
+            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1)
+        });
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, entry => entry.Code == "discord.memberrole.backfill_needed");
+    }
+
     private static ServerSettings CreateServerSettings(bool isActive = true, bool enableSpamGuard = false, ulong honeypotChannelId = 654) => new()
     {
         Name = "Test Server",
