@@ -1,15 +1,26 @@
 site_name: BrrainzBot
-site_description: Friendly Discord onboarding and spam defense
-site_url: https://ap.github.io/BrrainzBot/
+site_description: Friendly Discord onboarding, human verification, and spam defense for self-hosted communities
+site_url: https://pardeike.github.io/BrrainzBot/
+repo_url: https://github.com/pardeike/BrrainzBot
+repo_name: pardeike/BrrainzBot
 theme:
   name: material
+  logo: assets/brand/brrainzbot-mark.svg
+  favicon: assets/brand/brrainzbot-mark.svg
   palette:
-    primary: blue
-    accent: teal
+    primary: custom
+    accent: custom
   features:
     - navigation.sections
     - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
     - content.code.copy
+extra_css:
+  - stylesheets/extra.css
+extra_javascript:
+  - javascripts/extra.js
 nav:
   - Home: index.md
   - Installation: installation.md
