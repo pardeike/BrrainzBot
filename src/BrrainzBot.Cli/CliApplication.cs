@@ -259,7 +259,7 @@ internal static class CliApplication
 
                 var totalText = report.TotalUsers > 0 ? report.TotalUsers.ToString() : "?";
                 AnsiConsole.MarkupLine(
-                    $"[grey]Progress:[/] {report.ProcessedUsers}/{totalText} users scanned; added {report.Added}, already had MEMBER {report.AlreadyHadMember}, skipped NEW {report.NewUsersSkipped}, skipped bots {report.BotsSkipped}, failed {report.Failed}.");
+                    $"[grey]Progress:[/] {report.ProcessedUsers}/{totalText} users handled; added {report.Added}, already had MEMBER {report.AlreadyHadMember}, skipped NEW {report.NewUsersSkipped}, skipped bots {report.BotsSkipped}, failed {report.Failed}.");
             });
             var result = await admin.SetMembersAsync(settings, serverId, progress, CancellationToken.None);
 

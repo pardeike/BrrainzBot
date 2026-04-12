@@ -10,6 +10,8 @@ namespace BrrainzBot.Infrastructure;
 
 public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<ServerAdministrationService> logger)
 {
+    private const int SetMembersParallelism = 8;
+
     public async Task<CreateMemberRoleResult> CreateMemberRoleAsync(
         BotSettings settings,
         ulong? requestedServerId,
@@ -166,7 +168,6 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 var added = 0;
                 var failed = 0;
                 var processedUsers = 0;
-                var lastReportedProcessedUsers = -1;
 
                 progress?.Report(new SetMembersProgress(
                     Phase: "Assigning MEMBER",
@@ -179,59 +180,63 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     Added: 0,
                     Failed: 0));
 
-                foreach (var member in server.Users.OrderBy(member => member.Id))
-                {
-                    processedUsers++;
+                var members = server.Users.OrderBy(member => member.Id).ToArray();
 
-                    if (member.IsBot)
+                await Parallel.ForEachAsync(
+                    members,
+                    new ParallelOptions
                     {
-                        botsSkipped++;
-                    }
-                    else
+                        CancellationToken = cancellationToken,
+                        MaxDegreeOfParallelism = SetMembersParallelism
+                    },
+                    async (member, _) =>
                     {
-                        checkedMembers++;
-
-                        if (member.Roles.Any(role => role.Id == memberRole.Id))
+                        if (member.IsBot)
                         {
-                            alreadyHadMember++;
-                        }
-                        else if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
-                        {
-                            newUsersSkipped++;
+                            Interlocked.Increment(ref botsSkipped);
                         }
                         else
                         {
-                            try
+                            Interlocked.Increment(ref checkedMembers);
+
+                            if (member.Roles.Any(role => role.Id == memberRole.Id))
                             {
-                                await member.AddRoleAsync(memberRole);
-                                added++;
+                                Interlocked.Increment(ref alreadyHadMember);
                             }
-                            catch (Exception ex)
+                            else if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
                             {
-                                failed++;
-                                logger.LogWarning(ex, "Failed to add MEMBER to user {UserId} in server {ServerId}", member.Id, server.Id);
+                                Interlocked.Increment(ref newUsersSkipped);
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    await member.AddRoleAsync(memberRole);
+                                    Interlocked.Increment(ref added);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Interlocked.Increment(ref failed);
+                                    logger.LogWarning(ex, "Failed to add MEMBER to user {UserId} in server {ServerId}", member.Id, server.Id);
+                                }
                             }
                         }
-                    }
 
-                    var shouldReport = processedUsers == totalUsers
-                        || processedUsers - lastReportedProcessedUsers >= 100;
-
-                    if (shouldReport)
-                    {
-                        progress?.Report(new SetMembersProgress(
-                            Phase: "Assigning MEMBER",
-                            TotalUsers: totalUsers,
-                            ProcessedUsers: processedUsers,
-                            CheckedMembers: checkedMembers,
-                            BotsSkipped: botsSkipped,
-                            AlreadyHadMember: alreadyHadMember,
-                            NewUsersSkipped: newUsersSkipped,
-                            Added: added,
-                            Failed: failed));
-                        lastReportedProcessedUsers = processedUsers;
-                    }
-                }
+                        var processed = Interlocked.Increment(ref processedUsers);
+                        if (processed == totalUsers || processed % 100 == 0)
+                        {
+                            progress?.Report(new SetMembersProgress(
+                                Phase: "Assigning MEMBER",
+                                TotalUsers: totalUsers,
+                                ProcessedUsers: processed,
+                                CheckedMembers: Volatile.Read(ref checkedMembers),
+                                BotsSkipped: Volatile.Read(ref botsSkipped),
+                                AlreadyHadMember: Volatile.Read(ref alreadyHadMember),
+                                NewUsersSkipped: Volatile.Read(ref newUsersSkipped),
+                                Added: Volatile.Read(ref added),
+                                Failed: Volatile.Read(ref failed)));
+                        }
+                    });
 
                 return new SetMembersResult(
                     serverSettings.Name,
