@@ -548,12 +548,6 @@ body {
   .steps-grid {
     grid-template-columns: 1fr;
   }
-
-  .hero-mini {
-    position: static;
-    max-width: none;
-    transform: none;
-  }
 }
 
 @media screen and (max-width: 64em) {
