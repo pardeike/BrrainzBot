@@ -20,7 +20,11 @@ public sealed class BotDoctorTests
                     WelcomeChannelId = 0,
                     NewRoleId = 0,
                     MemberRoleId = 0,
-                    OwnerUserId = 0
+                    OwnerUserId = 0,
+                    SpamGuard = new SpamGuardSettings
+                    {
+                        HoneypotChannelId = 0
+                    }
                 }
             ]
         };
@@ -49,7 +53,11 @@ public sealed class BotDoctorTests
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 123,
-                    OwnerUserId = 999
+                    OwnerUserId = 999,
+                    SpamGuard = new SpamGuardSettings
+                    {
+                        HoneypotChannelId = 654
+                    }
                 }
             ]
         };
@@ -77,7 +85,11 @@ public sealed class BotDoctorTests
                     WelcomeChannelId = 456,
                     NewRoleId = 789,
                     MemberRoleId = 789,
-                    OwnerUserId = 999
+                    OwnerUserId = 999,
+                    SpamGuard = new SpamGuardSettings
+                    {
+                        HoneypotChannelId = 654
+                    }
                 }
             ]
         };
@@ -87,6 +99,38 @@ public sealed class BotDoctorTests
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
         Assert.Contains(report.Messages, message => message.Code == "guild.roles.same");
+    }
+
+    [Fact]
+    public async Task DoctorRejectsMissingHoneypotChannelWhenSpamGuardIsEnabled()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory());
+        var settings = new BotSettings
+        {
+            Guilds =
+            [
+                new GuildSettings
+                {
+                    Name = "Test Guild",
+                    GuildId = 123,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 1000,
+                    OwnerUserId = 999,
+                    EnableSpamGuard = true,
+                    SpamGuard = new SpamGuardSettings
+                    {
+                        HoneypotChannelId = 0
+                    }
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets();
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, message => message.Code == "guild.honeypot.zero");
     }
 
     private static AppPaths CreatePathsWithPlaceholderFiles()

@@ -69,7 +69,7 @@ public sealed class OnboardingSettings
 
 public sealed class SpamGuardSettings
 {
-    public string HoneypotChannelName { get; init; } = "intro";
+    public ulong HoneypotChannelId { get; init; }
     public int PastMessageIntervalSeconds { get; init; } = 300;
     public int FutureMessageIntervalSeconds { get; init; } = 300;
     public int MessageDeltaIntervalSeconds { get; init; } = 120;

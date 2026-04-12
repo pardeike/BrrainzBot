@@ -63,6 +63,8 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 report.AddError("guild.newrole.zero", $"{guild.Name}: NewRoleId must not be zero.");
             if (guild.MemberRoleId == 0)
                 report.AddError("guild.memberrole.zero", $"{guild.Name}: MemberRoleId must not be zero.");
+            if (guild.EnableSpamGuard && guild.SpamGuard.HoneypotChannelId == 0)
+                report.AddError("guild.honeypot.zero", $"{guild.Name}: HoneypotChannelId must not be zero when SpamGuard is enabled.");
             if (guild.MemberRoleId == guild.NewRoleId && guild.MemberRoleId != 0)
                 report.AddError("guild.roles.same", $"{guild.Name}: MemberRoleId and NewRoleId must not be the same.");
             if (guild.OwnerUserId == 0)
@@ -99,6 +101,8 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             var channelIds = channelsDoc.RootElement.EnumerateArray().Select(c => c.GetProperty("id").GetString()).ToHashSet();
             if (!channelIds.Contains(guild.WelcomeChannelId.ToString()))
                 report.AddError("discord.welcome.notfound", $"{guild.Name}: WelcomeChannelId does not exist in the guild.");
+            if (guild.EnableSpamGuard && !channelIds.Contains(guild.SpamGuard.HoneypotChannelId.ToString()))
+                report.AddError("discord.honeypot.notfound", $"{guild.Name}: HoneypotChannelId does not exist in the guild.");
         }
 
         using var roleResponse = await client.GetAsync($"guilds/{guild.GuildId}/roles", cancellationToken);

@@ -23,7 +23,7 @@ The wizard asks for:
 - your OpenAI-compatible endpoint URL
 - your AI model name
 - your AI API key
-- the Discord IDs for your guild, roles, and welcome channel
+- the Discord IDs for your guild, roles, welcome channel, and spam honeypot channel
 
 It stores:
 

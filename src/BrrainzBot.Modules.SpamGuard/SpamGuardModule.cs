@@ -42,7 +42,7 @@ public sealed class SpamGuardModule(
 
         var spamSettings = guildSettings.SpamGuard;
         var tracker = GetTracker(channel.Guild.Id, spamSettings);
-        var (result, firstChannelId) = tracker.CheckMessage(channel.Name, message.Author.Id, channel.Id, message.Content, message.Timestamp);
+        var (result, firstChannelId) = tracker.CheckMessage(message.Author.Id, channel.Id, message.Content, message.Timestamp);
 
         switch (result)
         {
@@ -119,7 +119,7 @@ public sealed class SpamGuardModule(
             settingsForGuild.MinimumMessageLength,
             settingsForGuild.LinkRequired,
             settingsForGuild.MessageSimilarityThreshold,
-            settingsForGuild.HoneypotChannelName);
+            settingsForGuild.HoneypotChannelId);
         _trackers[guildId] = tracker;
         return tracker;
     }

@@ -2,13 +2,12 @@ using System.Collections.Concurrent;
 
 namespace BrrainzBot.Modules.SpamGuard;
 
-public sealed class MessageTracker(int deltaInterval, int minimumMessageLength, bool linkRequired, double similarityThreshold, string honeypotChannelName)
+public sealed class MessageTracker(int deltaInterval, int minimumMessageLength, bool linkRequired, double similarityThreshold, ulong honeypotChannelId)
 {
     private readonly ConcurrentDictionary<ulong, List<TrackedMessage>> _userMessages = new();
     private readonly ConcurrentDictionary<ulong, DateTimeOffset> _honeypotDetectedUsers = new();
 
     public (SpamDetectionResult Result, ulong FirstChannelId) CheckMessage(
-        string channelName,
         ulong userId,
         ulong channelId,
         string content,
@@ -23,7 +22,7 @@ public sealed class MessageTracker(int deltaInterval, int minimumMessageLength, 
             (timestamp - detectionTime).TotalSeconds <= deltaInterval)
             return (SpamDetectionResult.HoneypotDetected, 0);
 
-        if (string.Equals(channelName, honeypotChannelName, StringComparison.OrdinalIgnoreCase))
+        if (channelId == honeypotChannelId)
         {
             _honeypotDetectedUsers[userId] = timestamp;
             return (SpamDetectionResult.HoneypotTriggered, 0);

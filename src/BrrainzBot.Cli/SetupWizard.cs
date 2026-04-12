@@ -95,7 +95,7 @@ internal static class SetupWizard
             },
             SpamGuard = new SpamGuardSettings
             {
-                HoneypotChannelName = AskText("Spam honeypot channel name", existing?.SpamGuard.HoneypotChannelName ?? "intro"),
+                HoneypotChannelId = AskUlong("Spam honeypot channel ID", existing?.SpamGuard.HoneypotChannelId),
                 PastMessageIntervalSeconds = AskInt("Delete how many seconds of past messages on trigger?", existing?.SpamGuard.PastMessageIntervalSeconds ?? 300),
                 FutureMessageIntervalSeconds = AskInt("Continue deleting for how many seconds after trigger?", existing?.SpamGuard.FutureMessageIntervalSeconds ?? 300),
                 MessageDeltaIntervalSeconds = AskInt("Duplicate detection window in seconds", existing?.SpamGuard.MessageDeltaIntervalSeconds ?? 120),

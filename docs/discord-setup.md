@@ -95,6 +95,7 @@ You will need:
 
 - guild ID
 - welcome channel ID
+- spam honeypot channel ID if you use SpamGuard
 - `NEW` role ID
 - `MEMBER` role ID, or the guild ID if you want to use `@everyone`
 - your own Discord user ID for uncertain-case DMs

@@ -35,6 +35,7 @@ Each guild has its own:
 
 - guild ID
 - welcome channel ID
+- spam honeypot channel ID when SpamGuard is enabled
 - `NEW` role ID
 - `MEMBER` role ID, or the guild ID to use `@everyone`
 - owner user ID
