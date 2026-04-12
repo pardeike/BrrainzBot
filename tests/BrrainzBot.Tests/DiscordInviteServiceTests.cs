@@ -21,7 +21,6 @@ public sealed class DiscordInviteServiceTests
                     Name = "Test Server",
                     ServerId = 123,
                     WelcomeChannelId = 456,
-                    NewRoleId = 789,
                     MemberRoleId = 1000,
                     OwnerUserId = 999
                 }

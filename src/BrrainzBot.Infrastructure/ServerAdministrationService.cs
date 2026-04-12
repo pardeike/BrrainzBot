@@ -8,7 +8,10 @@ using System.Net;
 
 namespace BrrainzBot.Infrastructure;
 
-public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<ServerAdministrationService> logger)
+public sealed class ServerAdministrationService(
+    RuntimeSecrets secrets,
+    IVerificationSessionStore sessionStore,
+    ILogger<ServerAdministrationService> logger)
 {
     private const int SetMembersParallelism = 8;
 
@@ -132,7 +135,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
         CancellationToken cancellationToken)
     {
         var serverSettings = ResolveServer(settings, requestedServerId);
-        if (serverSettings.MemberRoleId == 0 || serverSettings.UsesEveryoneAsMemberState)
+        if (serverSettings.MemberRoleId == 0 || serverSettings.MemberRoleId == serverSettings.ServerId)
             throw new InvalidOperationException("This server does not have a real MEMBER role configured. Run `brrainzbot create-member` first.");
 
         try
@@ -146,6 +149,10 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
 
                 var memberRole = server.GetRole(serverSettings.MemberRoleId)
                     ?? throw new InvalidOperationException("The configured MEMBER role does not exist on the server. Run `brrainzbot create-member` first.");
+                var activeOnboardingUserIds = (await sessionStore.ListAsync(cancellationToken))
+                    .Where(session => session.ServerId == serverSettings.ServerId)
+                    .Select(session => session.UserId)
+                    .ToHashSet();
 
                 progress?.Report(new SetMembersProgress(
                     Phase: "Downloading members",
@@ -154,7 +161,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     CheckedMembers: 0,
                     BotsSkipped: 0,
                     AlreadyHadMember: 0,
-                    NewUsersSkipped: 0,
+                    ActiveOnboardingSkipped: 0,
                     Added: 0,
                     Failed: 0));
 
@@ -164,7 +171,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 var checkedMembers = 0;
                 var botsSkipped = 0;
                 var alreadyHadMember = 0;
-                var newUsersSkipped = 0;
+                var activeOnboardingSkipped = 0;
                 var added = 0;
                 var failed = 0;
                 var processedUsers = 0;
@@ -176,7 +183,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     CheckedMembers: 0,
                     BotsSkipped: 0,
                     AlreadyHadMember: 0,
-                    NewUsersSkipped: 0,
+                    ActiveOnboardingSkipped: 0,
                     Added: 0,
                     Failed: 0));
 
@@ -203,9 +210,9 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                             {
                                 Interlocked.Increment(ref alreadyHadMember);
                             }
-                            else if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
+                            else if (activeOnboardingUserIds.Contains(member.Id))
                             {
-                                Interlocked.Increment(ref newUsersSkipped);
+                                Interlocked.Increment(ref activeOnboardingSkipped);
                             }
                             else
                             {
@@ -232,7 +239,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                                 CheckedMembers: Volatile.Read(ref checkedMembers),
                                 BotsSkipped: Volatile.Read(ref botsSkipped),
                                 AlreadyHadMember: Volatile.Read(ref alreadyHadMember),
-                                NewUsersSkipped: Volatile.Read(ref newUsersSkipped),
+                                ActiveOnboardingSkipped: Volatile.Read(ref activeOnboardingSkipped),
                                 Added: Volatile.Read(ref added),
                                 Failed: Volatile.Read(ref failed)));
                         }
@@ -245,7 +252,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                     checkedMembers,
                     botsSkipped,
                     alreadyHadMember,
-                    newUsersSkipped,
+                    activeOnboardingSkipped,
                     added,
                     failed);
             }, cancellationToken);
@@ -274,7 +281,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
 
     private static IRole? ResolveMemberRole(SocketGuild server, ServerSettings serverSettings)
     {
-        if (serverSettings.MemberRoleId != 0 && serverSettings.MemberRoleId != serverSettings.ServerId)
+        if (serverSettings.MemberRoleId != 0 && serverSettings.MemberRoleId != server.Id)
         {
             var configuredRole = server.GetRole(serverSettings.MemberRoleId);
             if (configuredRole != null)
@@ -294,7 +301,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
         ex.HttpCode == HttpStatusCode.Forbidden || ex.DiscordCode == DiscordErrorCode.MissingPermissions;
 
     private static string BuildMissingPermissionsHint(string commandName) =>
-        $"Discord returned Missing Permissions during `{commandName}`. The usual causes are: the bot role is below NEW or MEMBER, the bot is missing Manage Roles or Manage Channels, or the server has server-wide 2FA enabled and the bot owner account does not have 2FA enabled.";
+        $"Discord returned Missing Permissions during `{commandName}`. The usual causes are: the bot role is below MEMBER, the bot is missing Manage Roles or Manage Channels, or the server has server-wide 2FA enabled and the bot owner account does not have 2FA enabled.";
 
     private static IReadOnlyList<string> DescribeGuildPermissions(ulong rawPermissions) => Enum
         .GetValues<GuildPermission>()
@@ -394,7 +401,7 @@ public sealed record SetMembersResult(
     int CheckedMembers,
     int BotsSkipped,
     int AlreadyHadMember,
-    int NewUsersSkipped,
+    int ActiveOnboardingSkipped,
     int Added,
     int Failed);
 
@@ -405,6 +412,6 @@ public sealed record SetMembersProgress(
     int CheckedMembers,
     int BotsSkipped,
     int AlreadyHadMember,
-    int NewUsersSkipped,
+    int ActiveOnboardingSkipped,
     int Added,
     int Failed);

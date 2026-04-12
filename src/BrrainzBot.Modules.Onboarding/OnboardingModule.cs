@@ -42,15 +42,6 @@ public sealed class OnboardingModule(
         var serverSettings = FindActiveServerSettings(user.Guild.Id);
         if (serverSettings is not { EnableOnboarding: true })
             return;
-
-        var newRole = user.Guild.GetRole(serverSettings.NewRoleId);
-        if (newRole == null)
-        {
-            logger.LogWarning("The NEW role {RoleId} is missing for server {ServerId}.", serverSettings.NewRoleId, user.Guild.Id);
-            return;
-        }
-
-        await user.AddRoleAsync(newRole);
         var session = new VerificationSession
         {
             ServerId = user.Guild.Id,
@@ -189,26 +180,17 @@ public sealed class OnboardingModule(
         if (server == null || member == null)
             throw new InvalidOperationException("The server member could not be resolved during approval.");
 
-        var newRole = server.GetRole(serverSettings.NewRoleId);
-        if (newRole == null)
-            throw new InvalidOperationException("The NEW role is missing for approval.");
+        var memberRole = server.GetRole(serverSettings.MemberRoleId)
+            ?? throw new InvalidOperationException("The member role is missing for approval.");
+        await member.AddRoleAsync(memberRole);
 
-        if (!serverSettings.UsesEveryoneAsMemberState)
-        {
-            var memberRole = server.GetRole(serverSettings.MemberRoleId)
-                ?? throw new InvalidOperationException("The member role is missing for approval.");
-            await member.AddRoleAsync(memberRole);
-        }
-
-        await member.RemoveRoleAsync(newRole);
         await sessionStore.RemoveAsync(session.ServerId, session.UserId, CancellationToken.None);
         await auditLog.WriteAsync("verification_approved", new
         {
             serverId = session.ServerId,
             userId = session.UserId,
             reason = decision.Reason,
-            confidence = decision.Confidence,
-            usesEveryoneAsMemberState = serverSettings.UsesEveryoneAsMemberState
+            confidence = decision.Confidence
         }, CancellationToken.None);
         await modal.RespondAsync(decision.FriendlyReply, ephemeral: true);
     }
@@ -338,6 +320,14 @@ public sealed class OnboardingModule(
                     continue;
                 }
 
+                var resolvedServer = server!;
+                var memberRole = resolvedServer.GetRole(serverSettings.MemberRoleId);
+                if (memberRole != null && member.Roles.Any(role => role.Id == memberRole.Id))
+                {
+                    await sessionStore.RemoveAsync(session.ServerId, session.UserId, cancellationToken);
+                    continue;
+                }
+
                 try
                 {
                     await member.KickAsync("Verification expired");
@@ -350,7 +340,7 @@ public sealed class OnboardingModule(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Failed to kick stale NEW user {UserId} from server {ServerId}", session.UserId, session.ServerId);
+                    logger.LogWarning(ex, "Failed to kick stale unverified user {UserId} from server {ServerId}", session.UserId, session.ServerId);
                 }
             }
         }

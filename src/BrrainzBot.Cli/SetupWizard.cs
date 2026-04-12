@@ -157,10 +157,10 @@ internal static class SetupWizard
     {
         WriteSectionHeader("IDs and roles", $"Create the roles and channels first, then copy their IDs. Guide: {DiscordSetupUrl}");
         draft.WelcomeChannelId = AskSnowflake("Welcome channel ID", draft.WelcomeChannelId);
-        draft.NewRoleId = AskSnowflake("NEW role ID", draft.NewRoleId);
-
-        AnsiConsole.MarkupLine("[grey]Recommended: use a real MEMBER role. Simpler but weaker: enter the server ID here to use @everyone instead.[/]");
-        draft.MemberRoleId = AskSnowflake("MEMBER role ID", draft.MemberRoleId);
+        draft.MemberRoleId = AskSnowflake(
+            "MEMBER role ID",
+            draft.MemberRoleId,
+            "Use a real MEMBER role. If you still need to create it, run `brrainzbot create-member <serverId>` after setup.");
     }
 
     private static void EditOnboarding(ServerDraft draft)
@@ -177,7 +177,7 @@ internal static class SetupWizard
         draft.RulesHint = AskRequiredText("Rules hint shown in the welcome panel", draft.RulesHint);
         draft.MaxAttempts = AskInt("Maximum verification attempts", draft.MaxAttempts);
         draft.CooldownMinutes = AskInt("Cooldown after a failed attempt (minutes)", draft.CooldownMinutes);
-        draft.StaleTimeoutHours = AskInt("Auto-kick NEW users after how many hours?", draft.StaleTimeoutHours);
+        draft.StaleTimeoutHours = AskInt("Auto-kick unverified newcomers after how many hours?", draft.StaleTimeoutHours);
         draft.FirstQuestionLabel = AskRequiredText("First verification question", draft.FirstQuestionLabel);
         draft.SecondQuestionLabel = AskRequiredText("Second verification question", draft.SecondQuestionLabel);
         draft.ThirdQuestionLabel = AskRequiredText("Third verification question", draft.ThirdQuestionLabel);
@@ -204,10 +204,8 @@ internal static class SetupWizard
         table.AddRow("Onboarding", draft.EnableOnboarding ? "[green]on[/]" : "[grey]off[/]");
         table.AddRow("Spam cleanup", draft.EnableSpamGuard ? "[green]on[/]" : "[grey]off[/]");
         table.AddRow("Welcome channel ID", draft.WelcomeChannelId == 0 ? "[red]missing[/]" : draft.WelcomeChannelId.ToString());
-        table.AddRow("NEW role ID", draft.NewRoleId == 0 ? "[red]missing[/]" : draft.NewRoleId.ToString());
         table.AddRow("MEMBER role ID", draft.MemberRoleId == 0 ? "[red]missing[/]" : draft.MemberRoleId.ToString());
         table.AddRow("Owner user ID", draft.OwnerUserId == 0 ? "[red]missing[/]" : draft.OwnerUserId.ToString());
-        table.AddRow("Member state", draft.MemberRoleId != 0 && draft.MemberRoleId == draft.ServerId ? "@everyone (advanced)" : "MEMBER role");
 
         if (draft.EnableSpamGuard)
             table.AddRow("Honeypot channel ID", draft.HoneypotChannelId == 0 ? "[red]missing[/]" : draft.HoneypotChannelId.ToString());
@@ -284,7 +282,6 @@ internal static class SetupWizard
         public ulong ServerId { get; set; }
         public bool IsActive { get; set; }
         public ulong WelcomeChannelId { get; set; }
-        public ulong NewRoleId { get; set; }
         public ulong MemberRoleId { get; set; }
         public ulong OwnerUserId { get; set; }
         public bool EnableOnboarding { get; set; } = true;
@@ -321,8 +318,7 @@ internal static class SetupWizard
                 ServerId = existing.ServerId,
                 IsActive = existing.IsActive,
                 WelcomeChannelId = existing.WelcomeChannelId,
-                NewRoleId = existing.NewRoleId,
-                MemberRoleId = existing.MemberRoleId,
+                MemberRoleId = existing.MemberRoleId != 0 && existing.MemberRoleId != existing.ServerId ? existing.MemberRoleId : 0,
                 OwnerUserId = existing.OwnerUserId,
                 EnableOnboarding = existing.EnableOnboarding,
                 EnableSpamGuard = existing.EnableSpamGuard,
@@ -354,7 +350,6 @@ internal static class SetupWizard
             ServerId = ServerId,
             IsActive = IsActive,
             WelcomeChannelId = WelcomeChannelId,
-            NewRoleId = NewRoleId,
             MemberRoleId = MemberRoleId,
             OwnerUserId = OwnerUserId,
             EnableOnboarding = EnableOnboarding,

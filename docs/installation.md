@@ -7,7 +7,6 @@ Have these ready first:
 - a Discord bot token
 - your server ID
 - your `#welcome` channel ID
-- your `NEW` role ID
 - your `MEMBER` role ID
 - your own Discord user ID for owner DMs
 - an AI base URL, model, and API key

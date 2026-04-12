@@ -39,7 +39,6 @@ Each server has its own:
 - active on or off state
 - welcome channel ID
 - honeypot channel ID when spam cleanup is on
-- `NEW` role ID
 - `MEMBER` role ID
 - owner user ID
 - server topic prompt
@@ -47,26 +46,20 @@ Each server has its own:
 
 ## Recommended Role Model
 
-Recommended:
+Use one real `MEMBER` role:
 
-- `NEW` is temporary
+- `@everyone` is the baseline
 - `MEMBER` grants normal posting
-- `@everyone` does not grant normal posting by itself
+- people without `MEMBER` stay in the welcome path until approval
 
-Simpler but weaker:
-
-- use `@everyone` as the member state
-- set `MemberRoleId` to the server ID
-- let approval work by removing `NEW`
-
-The simpler model is fine for small low-risk servers. The real `MEMBER` role is safer.
-
-If you start with the simpler model and later want to migrate, use:
+If your server already uses `@everyone` for normal posting, use:
 
 ```bash
 ./brrainzbot create-member <serverId>
 ./brrainzbot set-members <serverId>
 ```
+
+Then move normal member permissions from `@everyone` to `MEMBER`.
 
 ## Good Prompting for the Onboarding AI
 

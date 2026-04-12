@@ -22,6 +22,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
     {
         var report = new DiagnosticReport();
         ValidateLocal(settings, secrets, paths, report);
+        var activeSessionsByServer = await LoadActiveSessionsByServerAsync(paths, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(secrets.DiscordToken))
         {
@@ -39,7 +40,13 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 
         foreach (var server in settings.Servers)
         {
-            await ValidateServerAsync(client, botUserId.Value, server, report, cancellationToken);
+            await ValidateServerAsync(
+                client,
+                botUserId.Value,
+                server,
+                activeSessionsByServer.GetValueOrDefault(server.ServerId) ?? [],
+                report,
+                cancellationToken);
         }
 
         return report;
@@ -70,24 +77,16 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 report.AddError("server.id.zero", $"{server.Name}: ServerId must not be zero.");
             if (server.WelcomeChannelId == 0)
                 report.AddError("server.welcome.zero", $"{server.Name}: WelcomeChannelId must not be zero.");
-            if (server.NewRoleId == 0)
-                report.AddError("server.newrole.zero", $"{server.Name}: NewRoleId must not be zero.");
             if (server.MemberRoleId == 0)
                 report.AddError("server.memberrole.zero", $"{server.Name}: MemberRoleId must not be zero.");
+            if (server.MemberRoleId == server.ServerId && server.MemberRoleId != 0)
+                report.AddError("server.memberrole.everyone.invalid", $"{server.Name}: MemberRoleId must point to a real MEMBER role. Run `brrainzbot create-member {server.ServerId}` and update setup.");
             if (server.EnableSpamGuard && server.SpamGuard.HoneypotChannelId == 0)
                 report.AddError("server.honeypot.zero", $"{server.Name}: HoneypotChannelId must not be zero when spam cleanup is enabled.");
-            if (server.MemberRoleId == server.NewRoleId && server.MemberRoleId != 0)
-                report.AddError("server.roles.same", $"{server.Name}: MemberRoleId and NewRoleId must not be the same.");
             if (server.OwnerUserId == 0)
                 report.AddError("server.owner.zero", $"{server.Name}: OwnerUserId must not be zero.");
             if (server.Onboarding.MaxAttempts <= 0)
                 report.AddError("server.maxattempts.invalid", $"{server.Name}: MaxAttempts must be greater than zero.");
-            if (server.UsesEveryoneAsMemberState)
-            {
-                report.AddInfo(
-                    "server.memberrole.everyone",
-                    $"{server.Name}: MemberRoleId matches the server ID, so approval will only remove NEW and rely on @everyone as the member state. This is simpler, but weaker than a real MEMBER role.");
-            }
         }
     }
 
@@ -111,6 +110,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         HttpClient client,
         ulong botUserId,
         ServerSettings server,
+        HashSet<ulong> activeSessionUserIds,
         DiagnosticReport report,
         CancellationToken cancellationToken)
     {
@@ -127,8 +127,6 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             return;
         }
 
-        var serverJson = await serverResponse.Content.ReadAsStringAsync(cancellationToken);
-        using var serverDocument = JsonDocument.Parse(serverJson);
         var channels = await LoadChannelsAsync(client, server, report, cancellationToken);
         var roles = await LoadRolesAsync(client, server, report, cancellationToken);
 
@@ -149,13 +147,13 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 
         if (roles != null)
         {
-            if (!roles.ContainsKey(server.NewRoleId))
-                report.AddError("discord.newrole.notfound", $"{server.Name}: NewRoleId does not exist in the server.");
             if (!roles.ContainsKey(server.MemberRoleId))
                 report.AddError("discord.memberrole.notfound", $"{server.Name}: MemberRoleId does not exist in the server.");
 
             await ValidateRoleHierarchyAsync(client, botUserId, server, roles, report, cancellationToken);
         }
+
+        await ValidateMemberBackfillAsync(client, server, activeSessionUserIds, report, cancellationToken);
     }
 
     private static async Task<Dictionary<ulong, ChannelSnapshot>?> LoadChannelsAsync(
@@ -240,30 +238,20 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
     private static void ValidateWelcomeLayout(ServerSettings server, ChannelSnapshot welcomeChannel, DiagnosticReport report)
     {
         var everyoneOverwrite = welcomeChannel.FindRoleOverwrite(server.ServerId);
-        var newOverwrite = welcomeChannel.FindRoleOverwrite(server.NewRoleId);
         var memberOverwrite = welcomeChannel.FindRoleOverwrite(server.MemberRoleId);
 
-        if (server.UsesEveryoneAsMemberState)
+        if (Denies(everyoneOverwrite, ChannelPermission.ViewChannel))
         {
-            if (!Denies(everyoneOverwrite, ChannelPermission.ViewChannel))
-            {
-                report.AddWarning(
-                    "discord.welcome.everyone.visible",
-                    $"{server.Name}: #welcome should usually deny ViewChannel for @everyone when you use the simpler @everyone member state.");
-            }
-
-            if (!Allows(newOverwrite, ChannelPermission.ViewChannel))
-            {
-                report.AddWarning(
-                    "discord.welcome.new.hidden",
-                    $"{server.Name}: #welcome should allow ViewChannel for NEW when you use the simpler @everyone member state.");
-            }
+            report.AddWarning(
+                "discord.welcome.everyone.hidden",
+                $"{server.Name}: #welcome should stay visible to people who do not have MEMBER yet. Remove the @everyone ViewChannel deny there.");
         }
-        else if (!Denies(memberOverwrite, ChannelPermission.ViewChannel))
+
+        if (!Denies(memberOverwrite, ChannelPermission.ViewChannel))
         {
             report.AddWarning(
                 "discord.welcome.member.visible",
-                $"{server.Name}: #welcome should deny ViewChannel for MEMBER in the recommended role model.");
+                $"{server.Name}: #welcome should deny ViewChannel for MEMBER.");
         }
     }
 
@@ -325,8 +313,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 $"{server.Name}: the bot is missing required server permissions: {string.Join(", ", missingPermissions)}.");
         }
 
-        if (!server.UsesEveryoneAsMemberState
-            && roles.TryGetValue(server.ServerId, out var everyoneRole)
+        if (roles.TryGetValue(server.ServerId, out var everyoneRole)
             && roles.TryGetValue(server.MemberRoleId, out var memberRoleForCopyCheck))
         {
             var uncopiableMissingPermissions = DescribeGuildPermissions(
@@ -341,15 +328,7 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             }
         }
 
-        if (roles.TryGetValue(server.NewRoleId, out var newRole) && highestBotRolePosition <= newRole.Position)
-        {
-            report.AddError(
-                "discord.role_hierarchy.invalid",
-                $"{server.Name}: the bot role must be above NEW in the Discord role list.");
-        }
-
-        if (!server.UsesEveryoneAsMemberState
-            && roles.TryGetValue(server.MemberRoleId, out var memberRole)
+        if (roles.TryGetValue(server.MemberRoleId, out var memberRole)
             && highestBotRolePosition <= memberRole.Position)
         {
             report.AddError(
@@ -358,8 +337,84 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         }
     }
 
-    private static bool Allows(PermissionOverwriteSnapshot? overwrite, ChannelPermission permission) =>
-        overwrite != null && (overwrite.Allow & PermissionBit(permission)) != 0;
+    private static async Task<Dictionary<ulong, HashSet<ulong>>> LoadActiveSessionsByServerAsync(AppPaths paths, CancellationToken cancellationToken)
+    {
+        var store = new JsonVerificationSessionStore(paths);
+        var sessions = await store.ListAsync(cancellationToken);
+        return sessions
+            .GroupBy(session => session.ServerId)
+            .ToDictionary(group => group.Key, group => group.Select(session => session.UserId).ToHashSet());
+    }
+
+    private static async Task ValidateMemberBackfillAsync(
+        HttpClient client,
+        ServerSettings server,
+        HashSet<ulong> activeSessionUserIds,
+        DiagnosticReport report,
+        CancellationToken cancellationToken)
+    {
+        if (server.MemberRoleId == 0 || server.MemberRoleId == server.ServerId)
+            return;
+
+        try
+        {
+            var pendingBackfillCount = 0;
+            ulong? afterUserId = null;
+
+            while (true)
+            {
+                var path = afterUserId is { } after
+                    ? $"guilds/{server.ServerId}/members?limit=1000&after={after}"
+                    : $"guilds/{server.ServerId}/members?limit=1000";
+
+                using var response = await client.GetAsync(path, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    report.AddWarning("discord.members.unreachable", $"{server.Name}: could not validate existing members remotely.");
+                    return;
+                }
+
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var document = JsonDocument.Parse(json);
+                var members = document.RootElement.EnumerateArray().ToArray();
+                if (members.Length == 0)
+                    break;
+
+                foreach (var member in members)
+                {
+                    var userElement = member.GetProperty("user");
+                    var userId = ulong.Parse(userElement.GetProperty("id").GetString()!);
+                    var isBot = userElement.TryGetProperty("bot", out var botElement) && botElement.GetBoolean();
+                    if (isBot)
+                        continue;
+
+                    var hasMemberRole = member.GetProperty("roles")
+                        .EnumerateArray()
+                        .Select(role => role.GetString())
+                        .Any(roleId => ulong.TryParse(roleId, out var parsedRoleId) && parsedRoleId == server.MemberRoleId);
+                    if (hasMemberRole || activeSessionUserIds.Contains(userId))
+                        continue;
+
+                    pendingBackfillCount++;
+                }
+
+                afterUserId = ulong.Parse(members[^1].GetProperty("user").GetProperty("id").GetString()!);
+                if (members.Length < 1000)
+                    break;
+            }
+
+            if (pendingBackfillCount > 0)
+            {
+                report.AddWarning(
+                    "discord.memberrole.backfill_needed",
+                    $"{server.Name}: {pendingBackfillCount} existing non-bot users still lack MEMBER and are not in active onboarding. Run `brrainzbot set-members {server.ServerId}` before going live.");
+            }
+        }
+        catch (Exception)
+        {
+            report.AddWarning("discord.members.unreachable", $"{server.Name}: could not validate existing members remotely.");
+        }
+    }
 
     private static bool Denies(PermissionOverwriteSnapshot? overwrite, ChannelPermission permission) =>
         overwrite != null && (overwrite.Deny & PermissionBit(permission)) != 0;

@@ -40,7 +40,7 @@ If your server currently uses `@everyone` as the normal member state, you can mi
 What they do:
 
 - `create-member` creates or fixes a real `MEMBER` role and copies the current `@everyone` channel/category overrides to it
-- `set-members` gives that `MEMBER` role to existing non-bot users who are not still in `NEW`
+- `set-members` gives that `MEMBER` role to existing non-bot users who are not in active onboarding
 
 Run `create-member` first. Then run `set-members`. Only after that should you remove normal member permissions from `@everyone`.
 
@@ -101,8 +101,7 @@ The bot role is too low in Discord.
 
 Move it above:
 
-- `NEW`
-- `MEMBER` if you use the recommended role model
+- `MEMBER`
 
 ### The bot cannot see `#welcome`
 
@@ -116,15 +115,8 @@ Run `doctor` and check:
 
 That is a permission-layout problem, not a runtime bug.
 
-Safer model:
-
 - real `MEMBER` role
 - `@everyone` can view but not post
-
-Simpler model:
-
-- `@everyone` is the member state
-- `NEW` explicitly denies posting until approval
 
 ### I want to move from `@everyone` to a real `MEMBER` role
 

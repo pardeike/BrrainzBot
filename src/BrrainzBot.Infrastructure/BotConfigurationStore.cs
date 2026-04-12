@@ -130,7 +130,6 @@ public sealed class BotConfigurationStore
             ServerId = GuildId,
             IsActive = IsActive,
             WelcomeChannelId = WelcomeChannelId,
-            NewRoleId = NewRoleId,
             MemberRoleId = MemberRoleId,
             OwnerUserId = OwnerUserId,
             EnableOnboarding = EnableOnboarding,

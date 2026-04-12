@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace BrrainzBot.Host;
 
 public sealed class BotSettings
@@ -37,7 +35,6 @@ public sealed class ServerSettings
     public ulong ServerId { get; init; }
     public bool IsActive { get; init; }
     public ulong WelcomeChannelId { get; init; }
-    public ulong NewRoleId { get; init; }
     public ulong MemberRoleId { get; init; }
     public ulong OwnerUserId { get; init; }
     public bool EnableOnboarding { get; init; } = true;
@@ -46,9 +43,6 @@ public sealed class ServerSettings
     public List<ulong> PublicReadOnlyChannelIds { get; init; } = [];
     public OnboardingSettings Onboarding { get; init; } = new();
     public SpamGuardSettings SpamGuard { get; init; } = new();
-
-    [JsonIgnore]
-    public bool UsesEveryoneAsMemberState => ServerId != 0 && MemberRoleId == ServerId;
 }
 
 public sealed class OnboardingSettings

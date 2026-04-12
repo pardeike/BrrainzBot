@@ -108,24 +108,14 @@ In your Discord server, open:
 
 Create these roles:
 
-- `NEW`
 - `MEMBER`
 
 Recommended model:
 
 - `@everyone`: can look around, but does not grant normal posting
-- `NEW`: marks new users
 - `MEMBER`: grants normal participation
 
-Simpler but weaker model:
-
-- `@everyone`: normal member state
-- `NEW`: temporary deny role for new users
-- no separate `MEMBER` role
-
-If you choose the simpler model, enter the **server ID** as the member role ID during setup.
-
-If you later want to migrate to a real `MEMBER` role, BrrainzBot can help:
+If your server already uses `@everyone` for normal posting, BrrainzBot can help you move to a real `MEMBER` role:
 
 ```bash
 ./brrainzbot create-member <serverId>
@@ -141,13 +131,7 @@ You do **not** need to post anything there yourself. BrrainzBot will place the p
 Recommended `MEMBER` model:
 
 - `@everyone`: can view `#welcome`
-- `NEW`: can view `#welcome`
 - `MEMBER`: cannot view `#welcome`
-
-Simpler `@everyone` model:
-
-- `@everyone`: cannot view `#welcome`
-- `NEW`: can view `#welcome`
 
 ## 10. Set Public Channel Permissions
 
@@ -161,35 +145,15 @@ For the public channels you want newcomers to see:
 
 This is the safer model. New users never get normal posting access until approval.
 
-### Simpler `@everyone` model
-
-For the public channels you want newcomers to reach after approval:
-
-- `@everyone`: can view
-- `@everyone`: can post
-- `NEW`: cannot post
-
-This is simpler, but weaker. There is a short join-time window before the bot adds `NEW`.
-
-## 11. Set the Minimum `NEW` Permissions
-
-For the current welcome flow, `NEW` only needs:
-
-- `View Channel`
-- `Read Message History`
-
-`Use Application Commands` is not required for the current button and prompt flow.
-
-## 12. Move the Bot Role Above `NEW`
+## 11. Move the Bot Role Above `MEMBER`
 
 Open the server role list and move the bot role above:
 
-- `NEW`
-- `MEMBER` if you use the recommended model
+- `MEMBER`
 
 If the bot role is too low, the bot cannot move users between roles.
 
-## 13. Gather the IDs
+## 12. Gather the IDs
 
 Turn on **Developer Mode** in Discord first:
 
@@ -200,11 +164,10 @@ Then copy these IDs:
 - server ID
 - `#welcome` channel ID
 - spam honeypot channel ID if you use spam cleanup
-- `NEW` role ID
-- `MEMBER` role ID, or the server ID if you use `@everyone`
+- `MEMBER` role ID
 - your own Discord user ID
 
-## 14. Run Setup
+## 13. Run Setup
 
 Back in the terminal:
 
@@ -212,7 +175,7 @@ Back in the terminal:
 ./brrainzbot setup
 ```
 
-## 15. Run Doctor
+## 14. Run Doctor
 
 ```bash
 ./brrainzbot doctor
@@ -220,13 +183,13 @@ Back in the terminal:
 
 Fix anything it reports before you turn the server on.
 
-## 16. Enable the Server
+## 15. Enable the Server
 
 ```bash
 ./brrainzbot enable <serverId>
 ```
 
-## 17. Start the Bot
+## 16. Start the Bot
 
 ```bash
 ./brrainzbot run

@@ -261,18 +261,18 @@ internal static class CliApplication
                 var totalText = report.TotalUsers > 0 ? report.TotalUsers.ToString() : "?";
                 var etaText = FormatEta(report.ProcessedUsers, report.TotalUsers, stopwatch.Elapsed);
                 inlineProgress.Update(
-                    $"{report.ProcessedUsers}/{totalText} • add {report.Added} • had {report.AlreadyHadMember} • new {report.NewUsersSkipped} • bots {report.BotsSkipped} • fail {report.Failed}{etaText}");
+                    $"{report.ProcessedUsers}/{totalText} • add {report.Added} • had {report.AlreadyHadMember} • onboarding {report.ActiveOnboardingSkipped} • bots {report.BotsSkipped} • fail {report.Failed}{etaText}");
             });
             var result = await admin.SetMembersAsync(settings, serverId, progress, CancellationToken.None);
             inlineProgress.Complete();
 
-            var table = new Table().AddColumns("Server", "Checked", "Added", "Already had MEMBER", "Skipped NEW", "Skipped bots", "Failed");
+            var table = new Table().AddColumns("Server", "Checked", "Added", "Already had MEMBER", "Skipped onboarding", "Skipped bots", "Failed");
             table.AddRow(
                 Markup.Escape(result.ServerName),
                 result.CheckedMembers.ToString(),
                 result.Added.ToString(),
                 result.AlreadyHadMember.ToString(),
-                result.NewUsersSkipped.ToString(),
+                result.ActiveOnboardingSkipped.ToString(),
                 result.BotsSkipped.ToString(),
                 result.Failed.ToString());
             AnsiConsole.Write(table);
@@ -559,7 +559,6 @@ internal static class CliApplication
             ServerId = server.ServerId,
             IsActive = isActive,
             WelcomeChannelId = server.WelcomeChannelId,
-            NewRoleId = server.NewRoleId,
             MemberRoleId = server.MemberRoleId,
             OwnerUserId = server.OwnerUserId,
             EnableOnboarding = server.EnableOnboarding,
@@ -598,7 +597,6 @@ internal static class CliApplication
             ServerId = server.ServerId,
             IsActive = server.IsActive,
             WelcomeChannelId = server.WelcomeChannelId,
-            NewRoleId = server.NewRoleId,
             MemberRoleId = memberRoleId,
             OwnerUserId = server.OwnerUserId,
             EnableOnboarding = server.EnableOnboarding,
