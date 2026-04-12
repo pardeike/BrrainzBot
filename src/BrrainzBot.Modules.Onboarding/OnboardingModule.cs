@@ -205,12 +205,17 @@ public sealed class OnboardingModule(
         if (guild == null || member == null)
             throw new InvalidOperationException("The guild member could not be resolved during approval.");
 
-        var memberRole = guild.GetRole(guildSettings.MemberRoleId);
         var newRole = guild.GetRole(guildSettings.NewRoleId);
-        if (memberRole == null || newRole == null)
-            throw new InvalidOperationException("Required roles are missing for approval.");
+        if (newRole == null)
+            throw new InvalidOperationException("The NEW role is missing for approval.");
 
-        await member.AddRoleAsync(memberRole);
+        if (!guildSettings.UsesEveryoneAsMemberState)
+        {
+            var memberRole = guild.GetRole(guildSettings.MemberRoleId)
+                ?? throw new InvalidOperationException("The member role is missing for approval.");
+            await member.AddRoleAsync(memberRole);
+        }
+
         await member.RemoveRoleAsync(newRole);
         await sessionStore.RemoveAsync(session.GuildId, session.UserId, CancellationToken.None);
         await auditLog.WriteAsync("verification_approved", new
@@ -218,7 +223,8 @@ public sealed class OnboardingModule(
             guildId = session.GuildId,
             userId = session.UserId,
             reason = decision.Reason,
-            confidence = decision.Confidence
+            confidence = decision.Confidence,
+            usesEveryoneAsMemberState = guildSettings.UsesEveryoneAsMemberState
         }, CancellationToken.None);
         await modal.RespondAsync(decision.FriendlyReply, ephemeral: true);
     }

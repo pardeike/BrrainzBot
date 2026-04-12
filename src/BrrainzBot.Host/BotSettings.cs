@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace BrrainzBot.Host;
 
 public sealed class BotSettings
@@ -43,6 +45,9 @@ public sealed class GuildSettings
     public List<ulong> PublicReadOnlyChannelIds { get; init; } = [];
     public OnboardingSettings Onboarding { get; init; } = new();
     public SpamGuardSettings SpamGuard { get; init; } = new();
+
+    [JsonIgnore]
+    public bool UsesEveryoneAsMemberState => GuildId != 0 && MemberRoleId == GuildId;
 }
 
 public sealed class OnboardingSettings

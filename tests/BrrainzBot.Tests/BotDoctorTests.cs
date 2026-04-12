@@ -34,6 +34,70 @@ public sealed class BotDoctorTests
         Assert.Contains(report.Messages, message => message.Code == "guild.id.zero");
     }
 
+    [Fact]
+    public async Task DoctorExplainsWhenGuildIdIsUsedAsMemberRoleId()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory());
+        var settings = new BotSettings
+        {
+            Guilds =
+            [
+                new GuildSettings
+                {
+                    Name = "Test Guild",
+                    GuildId = 123,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 123,
+                    OwnerUserId = 999
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets();
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, message => message.Code == "guild.memberrole.everyone");
+        Assert.DoesNotContain(report.Messages, message => message.Code == "guild.memberrole.zero");
+    }
+
+    [Fact]
+    public async Task DoctorRejectsWhenNewAndMemberRoleIdsAreTheSame()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory());
+        var settings = new BotSettings
+        {
+            Guilds =
+            [
+                new GuildSettings
+                {
+                    Name = "Test Guild",
+                    GuildId = 123,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 789,
+                    OwnerUserId = 999
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets();
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.Contains(report.Messages, message => message.Code == "guild.roles.same");
+    }
+
+    private static AppPaths CreatePathsWithPlaceholderFiles()
+    {
+        var paths = AppPaths.FromRoot(Path.Combine(Path.GetTempPath(), $"brrainzbot-tests-{Guid.NewGuid():N}"));
+        paths.EnsureDirectoriesExist();
+        File.WriteAllText(paths.ConfigFilePath, "{}");
+        File.WriteAllText(paths.SecretsFilePath, "{}");
+        return paths;
+    }
+
     private sealed class StubHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(new StubMessageHandler());

@@ -36,7 +36,7 @@ Each guild has its own:
 - guild ID
 - welcome channel ID
 - `NEW` role ID
-- `MEMBER` role ID
+- `MEMBER` role ID, or the guild ID to use `@everyone`
 - owner user ID
 - onboarding prompt
 - feature toggles

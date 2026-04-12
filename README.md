@@ -16,7 +16,7 @@ It is built for self-hosters who want clear setup, clear docs, and predictable b
 - Lets new users browse most public channels in read-only mode.
 - Keeps the actual verification flow inside `#welcome`.
 - Uses one persistent welcome panel, buttons, modals, and ephemeral replies.
-- Promotes good users to `MEMBER`.
+- Promotes good users to `MEMBER`, or just removes `NEW` on `@everyone`-only servers.
 - Keeps spammy or off-topic users in `NEW`.
 - Auto-kicks stale `NEW` users after a configurable timeout.
 

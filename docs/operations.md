@@ -52,6 +52,8 @@ The bot writes local JSONL audit logs. These are useful for:
 
 Check the Discord role order. The bot role must sit above both `NEW` and `MEMBER`.
 
+If you use `@everyone` as the member state, the bot still needs to sit above `NEW`.
+
 ### The bot cannot see the welcome channel
 
 Run `doctor` and verify the welcome channel ID and permissions.
@@ -66,4 +68,9 @@ Check that:
 
 ### New users can still talk in public channels
 
-That is a Discord permission layout problem, not a bot bug. Make sure normal send access is granted by `MEMBER`, not by `@everyone`.
+That is a Discord permission layout problem, not a bot bug.
+
+Use one of these models:
+
+- separate `MEMBER` role: normal send access comes from `MEMBER`, not `@everyone`
+- `@everyone` member state: normal send access comes from `@everyone`, and `NEW` explicitly denies sending until approval

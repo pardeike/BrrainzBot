@@ -72,7 +72,7 @@ internal static class SetupWizard
             GuildId = AskUlong("Guild ID", existing?.GuildId),
             WelcomeChannelId = AskUlong("Welcome channel ID", existing?.WelcomeChannelId),
             NewRoleId = AskUlong("NEW role ID", existing?.NewRoleId),
-            MemberRoleId = AskUlong("MEMBER role ID", existing?.MemberRoleId),
+            MemberRoleId = AskUlong("MEMBER role ID (or the guild ID to use @everyone)", existing?.MemberRoleId),
             OwnerUserId = AskUlong("Owner user ID for uncertain-case DMs", existing?.OwnerUserId),
             EnableOnboarding = AskConfirmation("Enable onboarding / jail for this guild?", existing?.EnableOnboarding ?? true),
             EnableSpamGuard = AskConfirmation("Enable spam guard for this guild?", existing?.EnableSpamGuard ?? true),

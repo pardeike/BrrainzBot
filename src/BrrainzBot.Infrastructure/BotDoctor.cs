@@ -63,10 +63,18 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 report.AddError("guild.newrole.zero", $"{guild.Name}: NewRoleId must not be zero.");
             if (guild.MemberRoleId == 0)
                 report.AddError("guild.memberrole.zero", $"{guild.Name}: MemberRoleId must not be zero.");
+            if (guild.MemberRoleId == guild.NewRoleId && guild.MemberRoleId != 0)
+                report.AddError("guild.roles.same", $"{guild.Name}: MemberRoleId and NewRoleId must not be the same.");
             if (guild.OwnerUserId == 0)
                 report.AddError("guild.owner.zero", $"{guild.Name}: OwnerUserId must not be zero.");
             if (guild.Onboarding.MaxAttempts <= 0)
                 report.AddError("guild.maxattempts.invalid", $"{guild.Name}: MaxAttempts must be greater than zero.");
+            if (guild.UsesEveryoneAsMemberState)
+            {
+                report.AddInfo(
+                    "guild.memberrole.everyone",
+                    $"{guild.Name}: MemberRoleId matches the guild ID, so approval will only remove NEW and rely on @everyone as the member state.");
+            }
         }
     }
 
