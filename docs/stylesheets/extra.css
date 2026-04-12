@@ -421,13 +421,24 @@ body {
 }
 
 .story-grid {
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2.6rem;
+  align-items: start;
 }
 
 .bb-illustration-card {
   overflow: hidden;
   padding: 0.9rem;
+  width: min(100%, 27rem);
+  align-self: start;
+}
+
+.story-grid > .bb-illustration-card:first-child {
+  justify-self: start;
+}
+
+.story-grid > .bb-illustration-card:last-child {
+  justify-self: end;
 }
 
 .split-grid {
