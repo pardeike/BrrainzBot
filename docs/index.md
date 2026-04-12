@@ -9,7 +9,10 @@ hide:
   <div class="hero-grid">
     <div class="hero-copy reveal">
       <div class="hero-kicker"><span></span>Self-hosted. Clear. Quiet.</div>
-      <h1>Let people in.<br>Keep spam out.</h1>
+      <h1 class="hero-anchor">
+        <span class="hero-line">Let people in.</span>
+        <span class="hero-line">Keep spam out.</span>
+      </h1>
       <p class="lede">
         BrrainzBot gives new users a readable first view, keeps verification out of public chat, and removes common spam patterns.
         It is for Discord servers that want less noise and less setup friction.
@@ -34,8 +37,8 @@ hide:
       </div>
     </div>
     <div class="hero-visual reveal">
-      <div class="hero-card">
-        <img src="assets/illustrations/quiet-lobby.svg" alt="A bright, calm illustration of a friendly server lobby with a clear welcome path.">
+      <div class="hero-card hero-card-bot">
+        <img src="assets/illustrations/fluffy-bot.png" alt="A soft, hand-painted bot mark for BrrainzBot on a bright background.">
       </div>
       <div class="hero-mini">
         <strong>Good defaults</strong>
