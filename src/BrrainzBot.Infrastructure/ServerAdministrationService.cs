@@ -126,6 +126,7 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
     public async Task<SetMembersResult> SetMembersAsync(
         BotSettings settings,
         ulong? requestedServerId,
+        IProgress<SetMembersProgress>? progress,
         CancellationToken cancellationToken)
     {
         var serverSettings = ResolveServer(settings, requestedServerId);
@@ -144,7 +145,19 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 var memberRole = server.GetRole(serverSettings.MemberRoleId)
                     ?? throw new InvalidOperationException("The configured MEMBER role does not exist on the server. Run `brrainzbot create-member` first.");
 
+                progress?.Report(new SetMembersProgress(
+                    Phase: "Downloading members",
+                    TotalUsers: 0,
+                    ProcessedUsers: 0,
+                    CheckedMembers: 0,
+                    BotsSkipped: 0,
+                    AlreadyHadMember: 0,
+                    NewUsersSkipped: 0,
+                    Added: 0,
+                    Failed: 0));
+
                 await server.DownloadUsersAsync();
+                var totalUsers = server.Users.Count;
 
                 var checkedMembers = 0;
                 var botsSkipped = 0;
@@ -152,38 +165,71 @@ public sealed class ServerAdministrationService(RuntimeSecrets secrets, ILogger<
                 var newUsersSkipped = 0;
                 var added = 0;
                 var failed = 0;
+                var processedUsers = 0;
+                var lastReportedProcessedUsers = -1;
+
+                progress?.Report(new SetMembersProgress(
+                    Phase: "Assigning MEMBER",
+                    TotalUsers: totalUsers,
+                    ProcessedUsers: 0,
+                    CheckedMembers: 0,
+                    BotsSkipped: 0,
+                    AlreadyHadMember: 0,
+                    NewUsersSkipped: 0,
+                    Added: 0,
+                    Failed: 0));
 
                 foreach (var member in server.Users.OrderBy(member => member.Id))
                 {
+                    processedUsers++;
+
                     if (member.IsBot)
                     {
                         botsSkipped++;
-                        continue;
+                    }
+                    else
+                    {
+                        checkedMembers++;
+
+                        if (member.Roles.Any(role => role.Id == memberRole.Id))
+                        {
+                            alreadyHadMember++;
+                        }
+                        else if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
+                        {
+                            newUsersSkipped++;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                await member.AddRoleAsync(memberRole);
+                                added++;
+                            }
+                            catch (Exception ex)
+                            {
+                                failed++;
+                                logger.LogWarning(ex, "Failed to add MEMBER to user {UserId} in server {ServerId}", member.Id, server.Id);
+                            }
+                        }
                     }
 
-                    checkedMembers++;
+                    var shouldReport = processedUsers == totalUsers
+                        || processedUsers - lastReportedProcessedUsers >= 100;
 
-                    if (member.Roles.Any(role => role.Id == memberRole.Id))
+                    if (shouldReport)
                     {
-                        alreadyHadMember++;
-                        continue;
-                    }
-
-                    if (serverSettings.NewRoleId != 0 && member.Roles.Any(role => role.Id == serverSettings.NewRoleId))
-                    {
-                        newUsersSkipped++;
-                        continue;
-                    }
-
-                    try
-                    {
-                        await member.AddRoleAsync(memberRole);
-                        added++;
-                    }
-                    catch (Exception ex)
-                    {
-                        failed++;
-                        logger.LogWarning(ex, "Failed to add MEMBER to user {UserId} in server {ServerId}", member.Id, server.Id);
+                        progress?.Report(new SetMembersProgress(
+                            Phase: "Assigning MEMBER",
+                            TotalUsers: totalUsers,
+                            ProcessedUsers: processedUsers,
+                            CheckedMembers: checkedMembers,
+                            BotsSkipped: botsSkipped,
+                            AlreadyHadMember: alreadyHadMember,
+                            NewUsersSkipped: newUsersSkipped,
+                            Added: added,
+                            Failed: failed));
+                        lastReportedProcessedUsers = processedUsers;
                     }
                 }
 
@@ -340,6 +386,17 @@ public sealed record SetMembersResult(
     string ServerName,
     ulong ServerId,
     ulong MemberRoleId,
+    int CheckedMembers,
+    int BotsSkipped,
+    int AlreadyHadMember,
+    int NewUsersSkipped,
+    int Added,
+    int Failed);
+
+public sealed record SetMembersProgress(
+    string Phase,
+    int TotalUsers,
+    int ProcessedUsers,
     int CheckedMembers,
     int BotsSkipped,
     int AlreadyHadMember,

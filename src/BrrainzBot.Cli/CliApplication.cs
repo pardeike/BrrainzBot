@@ -249,7 +249,19 @@ internal static class CliApplication
 
             var admin = services.GetRequiredService<ServerAdministrationService>();
             AnsiConsole.MarkupLine("[grey]Downloading members and assigning MEMBER where needed. This can take a while on large servers.[/]");
-            var result = await admin.SetMembersAsync(settings, serverId, CancellationToken.None);
+            var progress = new Progress<SetMembersProgress>(report =>
+            {
+                if (report.Phase == "Downloading members")
+                {
+                    AnsiConsole.MarkupLine("[grey]Downloading the member list from Discord...[/]");
+                    return;
+                }
+
+                var totalText = report.TotalUsers > 0 ? report.TotalUsers.ToString() : "?";
+                AnsiConsole.MarkupLine(
+                    $"[grey]Progress:[/] {report.ProcessedUsers}/{totalText} users scanned; added {report.Added}, already had MEMBER {report.AlreadyHadMember}, skipped NEW {report.NewUsersSkipped}, skipped bots {report.BotsSkipped}, failed {report.Failed}.");
+            });
+            var result = await admin.SetMembersAsync(settings, serverId, progress, CancellationToken.None);
 
             var table = new Table().AddColumns("Server", "Checked", "Added", "Already had MEMBER", "Skipped NEW", "Skipped bots", "Failed");
             table.AddRow(
