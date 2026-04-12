@@ -51,10 +51,10 @@ Use this every time you change:
 ./brrainzbot run
 ```
 
-## 5. Repair or Change an Existing Install
+## 5. Change an Existing Install
 
 ```bash
-./brrainzbot reconfigure
+./brrainzbot setup
 ```
 
 This reruns the guided flow with your current values as defaults.

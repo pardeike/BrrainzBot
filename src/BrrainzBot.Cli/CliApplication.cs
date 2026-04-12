@@ -21,8 +21,7 @@ internal static class CliApplication
         return command switch
         {
             "help" or "--help" or "-h" => ShowHelp(),
-            "setup" => await SetupAsync(paths, reconfigure: false),
-            "reconfigure" => await SetupAsync(paths, reconfigure: true),
+            "setup" => await SetupAsync(paths),
             "doctor" => await DoctorAsync(paths),
             "print-config" => await PrintConfigAsync(paths),
             "run" => await RunBotAsync(paths),
@@ -39,8 +38,7 @@ internal static class CliApplication
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("Usage: [aqua]brrainzbot[/] <command> [grey][[--root path]][/]");
         AnsiConsole.MarkupLine("Commands:");
-        AnsiConsole.MarkupLine("  [green]setup[/]         Create a fresh configuration with a guided wizard.");
-        AnsiConsole.MarkupLine("  [green]reconfigure[/]   Repair or change an existing configuration.");
+        AnsiConsole.MarkupLine("  [green]setup[/]         Create or update the configuration with a guided wizard.");
         AnsiConsole.MarkupLine("  [green]doctor[/]        Validate configuration, Discord IDs, and AI settings.");
         AnsiConsole.MarkupLine("  [green]print-config[/]  Show the current configuration with secrets redacted.");
         AnsiConsole.MarkupLine("  [green]run[/]           Start the bot.");
@@ -55,17 +53,12 @@ internal static class CliApplication
         return 1;
     }
 
-    private static async Task<int> SetupAsync(AppPaths paths, bool reconfigure)
+    private static async Task<int> SetupAsync(AppPaths paths)
     {
         var store = new BotConfigurationStore();
         var existing = store.Exists(paths)
             ? await store.LoadAsync(paths, CancellationToken.None)
             : ((BotSettings?)null, (RuntimeSecrets?)null);
-
-        if (reconfigure && existing.Item1 == null)
-        {
-            AnsiConsole.MarkupLine("[yellow]No existing configuration was found. Starting a fresh setup instead.[/]");
-        }
 
         var result = SetupWizard.Run(existing.Item1, existing.Item2, paths);
         await store.SaveAsync(paths, result.Settings, result.Secrets, CancellationToken.None);

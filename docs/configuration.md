@@ -25,7 +25,7 @@ The setup wizard writes both files for you.
 
 ```bash
 ./brrainzbot print-config
-./brrainzbot reconfigure
+./brrainzbot setup
 ./brrainzbot doctor
 ```
 

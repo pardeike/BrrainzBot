@@ -58,7 +58,6 @@ If you are starting from zero, use the full docs:
 
 ```bash
 brrainzbot setup
-brrainzbot reconfigure
 brrainzbot doctor
 brrainzbot print-config
 brrainzbot run
