@@ -538,6 +538,68 @@ public sealed class BotDoctorTests
         Assert.Contains("Create Instant Invite", message.Message);
     }
 
+    [Fact]
+    public async Task DoctorDoesNotWarnAboutPartialCopyWhenMemberAlreadyHasThosePermissions()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(request =>
+        {
+            return request.RequestUri?.AbsolutePath switch
+            {
+                "/api/v10/users/@me" => JsonResponse("""{ "id": "777" }"""),
+                "/api/v10/guilds/123" => JsonResponse("""{ "id": "123", "mfa_level": 0 }"""),
+                "/api/v10/guilds/123/channels" => JsonResponse("""
+                    [
+                      {
+                        "id": "456",
+                        "name": "welcome",
+                        "permission_overwrites": []
+                      }
+                    ]
+                    """),
+                "/api/v10/guilds/123/roles" => JsonResponse($$"""
+                    [
+                      { "id": "123", "name": "@everyone", "position": 0, "permissions": "{{EveryonePermissionsWithCreateInvite()}}" },
+                      { "id": "789", "name": "NEW", "position": 1, "permissions": "0" },
+                      { "id": "1000", "name": "MEMBER", "position": 2, "permissions": "{{EveryonePermissionsWithCreateInvite()}}" },
+                      { "id": "555", "name": "BrrainzBot", "position": 3, "permissions": "{{AllRequiredPermissions()}}" }
+                    ]
+                    """),
+                "/api/v10/guilds/123/members/777" => JsonResponse("""
+                    {
+                      "roles": [ "555" ]
+                    }
+                    """),
+                _ => new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            };
+        }));
+
+        var settings = new BotSettings
+        {
+            Servers =
+            [
+                new ServerSettings
+                {
+                    Name = "Test Server",
+                    ServerId = 123,
+                    IsActive = true,
+                    WelcomeChannelId = 456,
+                    NewRoleId = 789,
+                    MemberRoleId = 1000,
+                    OwnerUserId = 999
+                }
+            ]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.memberrole.partial_copy");
+    }
+
     private static AppPaths CreatePathsWithPlaceholderFiles()
     {
         var paths = AppPaths.FromRoot(Path.Combine(Path.GetTempPath(), $"brrainzbot-tests-{Guid.NewGuid():N}"));

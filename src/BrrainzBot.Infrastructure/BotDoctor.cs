@@ -333,14 +333,19 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 $"{server.Name}: the bot is missing required server permissions: {string.Join(", ", missingPermissions)}.");
         }
 
-        if (roles.TryGetValue(server.ServerId, out var everyoneRole))
+        if (!server.UsesEveryoneAsMemberState
+            && roles.TryGetValue(server.ServerId, out var everyoneRole)
+            && roles.TryGetValue(server.MemberRoleId, out var memberRoleForCopyCheck))
         {
-            var uncopiablePermissions = DescribeGuildPermissions(everyoneRole.PermissionsRawValue & ~botPermissions.RawValue);
-            if (uncopiablePermissions.Count > 0)
+            var uncopiableMissingPermissions = DescribeGuildPermissions(
+                everyoneRole.PermissionsRawValue
+                & ~botPermissions.RawValue
+                & ~memberRoleForCopyCheck.PermissionsRawValue);
+            if (uncopiableMissingPermissions.Count > 0)
             {
                 report.AddWarning(
                     "discord.memberrole.partial_copy",
-                    $"{server.Name}: `@everyone` has permissions the bot cannot grant to MEMBER with the current invite: {string.Join(", ", uncopiablePermissions)}. `create-member` will copy the rest and you will need to set these manually if you want them on MEMBER.");
+                    $"{server.Name}: `@everyone` has permissions the bot cannot grant to MEMBER with the current invite: {string.Join(", ", uncopiableMissingPermissions)}. `create-member` will copy the rest and you will need to set these manually if you want them on MEMBER.");
             }
         }
 
