@@ -3,6 +3,7 @@ using Discord;
 using Discord.Net;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace BrrainzBot.Modules.Onboarding;
 
@@ -19,6 +20,7 @@ public sealed class OnboardingModule(
     private const string WhyHereCustomId = "onboarding:why";
     private const string WhatDoYouWantCustomId = "onboarding:what";
     private const string RuleParaphraseCustomId = "onboarding:rule";
+    private readonly ConcurrentDictionary<(ulong ServerId, ulong UserId), SemaphoreSlim> verificationLocks = new();
 
     public string Name => "Onboarding";
 
@@ -93,9 +95,9 @@ public sealed class OnboardingModule(
         var modal = new ModalBuilder()
             .WithTitle("Quick verification")
             .WithCustomId(VerificationModalCustomId)
-            .AddTextInput(serverSettings.Onboarding.FirstQuestionLabel, WhyHereCustomId, TextInputStyle.Paragraph, maxLength: 300)
-            .AddTextInput(serverSettings.Onboarding.SecondQuestionLabel, WhatDoYouWantCustomId, TextInputStyle.Paragraph, maxLength: 300)
-            .AddTextInput(serverSettings.Onboarding.ThirdQuestionLabel, RuleParaphraseCustomId, TextInputStyle.Paragraph, maxLength: 300)
+            .AddTextInput(serverSettings.Onboarding.FirstQuestionLabel, WhyHereCustomId, TextInputStyle.Paragraph, maxLength: OnboardingInputGuard.AnswerMaxLength)
+            .AddTextInput(serverSettings.Onboarding.SecondQuestionLabel, WhatDoYouWantCustomId, TextInputStyle.Paragraph, maxLength: OnboardingInputGuard.AnswerMaxLength)
+            .AddTextInput(serverSettings.Onboarding.ThirdQuestionLabel, RuleParaphraseCustomId, TextInputStyle.Paragraph, maxLength: OnboardingInputGuard.AnswerMaxLength)
             .Build();
 
         await component.RespondWithModalAsync(modal);
@@ -113,31 +115,64 @@ public sealed class OnboardingModule(
         if (serverSettings == null)
             return;
 
-        var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
-        if (session.AttemptCount >= serverSettings.Onboarding.MaxAttempts)
+        var verificationLock = verificationLocks.GetOrAdd((serverId, modal.User.Id), static _ => new SemaphoreSlim(1, 1));
+        if (!await verificationLock.WaitAsync(0, CancellationToken.None))
         {
-            await modal.RespondAsync("You have already used all verification attempts.", ephemeral: true);
+            await modal.RespondAsync("I am already reviewing your last submission. Please wait a moment before sending another one.", ephemeral: true);
             return;
         }
 
-        var answersById = modal.Data.Components.ToDictionary(component => component.CustomId, component => component.Value ?? string.Empty);
-        var answers = new VerificationAnswers(
-            answersById.GetValueOrDefault(WhyHereCustomId, string.Empty),
-            answersById.GetValueOrDefault(WhatDoYouWantCustomId, string.Empty),
-            answersById.GetValueOrDefault(RuleParaphraseCustomId, string.Empty));
-
-        session.AttemptCount++;
-        var prompt = new VerificationPrompt(
-            serverSettings.Name,
-            serverSettings.ServerTopicPrompt,
-            serverSettings.Onboarding.RulesHint,
-            modal.User.Username,
-            modal.User.Id,
-            session.AttemptCount,
-            answers);
-
         try
         {
+            var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
+            if (session.CooldownUntil is { } cooldownUntil && cooldownUntil > DateTimeOffset.UtcNow)
+            {
+                await modal.RespondAsync(
+                    $"Please give it a moment before retrying. You can try again <t:{cooldownUntil.ToUnixTimeSeconds()}:R>.",
+                    ephemeral: true);
+                return;
+            }
+
+            if (session.AttemptCount >= serverSettings.Onboarding.MaxAttempts)
+            {
+                await modal.RespondAsync("You have already used all verification attempts.", ephemeral: true);
+                return;
+            }
+
+            var answersById = modal.Data.Components.ToDictionary(component => component.CustomId, component => component.Value ?? string.Empty);
+            var answers = new VerificationAnswers(
+                OnboardingInputGuard.SanitizeAnswer(answersById.GetValueOrDefault(WhyHereCustomId, string.Empty)),
+                OnboardingInputGuard.SanitizeAnswer(answersById.GetValueOrDefault(WhatDoYouWantCustomId, string.Empty)),
+                OnboardingInputGuard.SanitizeAnswer(answersById.GetValueOrDefault(RuleParaphraseCustomId, string.Empty)));
+
+            session.AttemptCount++;
+            session.CooldownUntil = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.Cooldown);
+            await sessionStore.UpsertAsync(session, CancellationToken.None);
+
+            if (OnboardingInputGuard.LooksLikeLowSignalSubmission(answers.WhyHere, answers.WhatDoYouWant, answers.RuleParaphrase))
+            {
+                await auditLog.WriteAsync("verification_local_retry", new
+                {
+                    serverId,
+                    userId = modal.User.Id,
+                    reason = "low_signal_submission",
+                    attempt = session.AttemptCount
+                }, CancellationToken.None);
+                await modal.RespondAsync(
+                    "Please answer with short real sentences about why you are here and what you want to do. Placeholder replies do not work here.",
+                    ephemeral: true);
+                return;
+            }
+
+            var prompt = new VerificationPrompt(
+                serverSettings.Name,
+                serverSettings.ServerTopicPrompt,
+                serverSettings.Onboarding.RulesHint,
+                modal.User.Username,
+                modal.User.Id,
+                session.AttemptCount,
+                answers);
+
             var decision = await aiProviderClient.EvaluateAsync(prompt, CancellationToken.None);
             session.LastDecisionReason = decision.Reason;
             session.LastOutcome = decision.Outcome;
@@ -159,6 +194,7 @@ public sealed class OnboardingModule(
         catch (Exception ex)
         {
             logger.LogError(ex, "Verification failed for user {UserId} in server {ServerId}", modal.User.Id, serverId);
+            var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
             session.LastDecisionReason = ex.Message;
             session.LastOutcome = VerificationOutcome.Uncertain;
             session.CooldownUntil = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.Cooldown);
@@ -174,6 +210,10 @@ public sealed class OnboardingModule(
                 error = ex.Message
             }, CancellationToken.None);
             await modal.RespondAsync("Something went wrong on the bot side. I’ve kept you in the welcome area and notified the server owner.", ephemeral: true);
+        }
+        finally
+        {
+            verificationLock.Release();
         }
     }
 

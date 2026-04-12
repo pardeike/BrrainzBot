@@ -84,6 +84,6 @@ Keep it short and concrete.
 
 - servers start out off
 - `3` attempts
-- `10` minute cooldown
+- `2` minute cooldown
 - `24` hour stale timeout
 - owner DMs only for uncertain cases and technical failures

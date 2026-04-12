@@ -319,7 +319,7 @@ internal static class SetupWizard
         public string StartButtonLabel { get; set; } = "Start verification";
         public string RulesHint { get; set; } = "Be kind, stay on topic, and do not spam.";
         public int MaxAttempts { get; set; } = 3;
-        public int CooldownMinutes { get; set; } = 10;
+        public int CooldownMinutes { get; set; } = 2;
         public int StaleTimeoutHours { get; set; } = 24;
         public string FirstQuestionLabel { get; set; } = "What brought you here?";
         public string SecondQuestionLabel { get; set; } = "What do you want to do here?";

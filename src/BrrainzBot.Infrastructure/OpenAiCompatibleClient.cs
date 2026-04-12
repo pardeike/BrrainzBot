@@ -40,24 +40,28 @@ Rules:
         client.Timeout = ai.Timeout;
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", secrets.AiApiKey);
 
-        var userPrompt = $$"""
-Server: {{prompt.ServerName}}
-Server guidance:
-{{prompt.ServerTopicPrompt}}
-
-Rules hint:
-{{prompt.RulesHint}}
-
-User:
-- name: {{prompt.UserName}}
-- id: {{prompt.UserId}}
-- attempt: {{prompt.AttemptNumber}}
-
-Answers:
-1. {{prompt.Answers.WhyHere}}
-2. {{prompt.Answers.WhatDoYouWant}}
-3. {{prompt.Answers.RuleParaphrase}}
-""";
+        var userPromptPayload = new
+        {
+            server = new
+            {
+                name = prompt.ServerName,
+                guidance = prompt.ServerTopicPrompt,
+                rulesHint = prompt.RulesHint
+            },
+            user = new
+            {
+                name = prompt.UserName,
+                id = prompt.UserId,
+                attempt = prompt.AttemptNumber
+            },
+            answers = new
+            {
+                whyHere = prompt.Answers.WhyHere,
+                whatDoYouWant = prompt.Answers.WhatDoYouWant,
+                ruleParaphrase = prompt.Answers.RuleParaphrase
+            }
+        };
+        var userPrompt = JsonSerializer.Serialize(userPromptPayload, JsonDefaults.Options);
 
         var requestBody = new
         {

@@ -52,7 +52,7 @@ public sealed class OnboardingSettings
     public string StartButtonLabel { get; init; } = "Start verification";
     public string RulesHint { get; init; } = "Be kind, stay on topic, and do not spam.";
     public int MaxAttempts { get; init; } = 3;
-    public TimeSpan Cooldown { get; init; } = TimeSpan.FromMinutes(10);
+    public TimeSpan Cooldown { get; init; } = TimeSpan.FromMinutes(2);
     public TimeSpan StaleTimeout { get; init; } = TimeSpan.FromHours(24);
     public bool NotifyOwnerOnUncertain { get; init; } = true;
     public bool NotifyOwnerOnTechnicalFailure { get; init; } = true;
