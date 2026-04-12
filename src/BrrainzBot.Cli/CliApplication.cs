@@ -239,6 +239,8 @@ internal static class CliApplication
     private static async Task<int> SetMembersAsync(AppPaths paths, IReadOnlyList<string> args)
     {
         var (settings, secrets) = await LoadRequiredConfigurationAsync(paths);
+        var inlineProgress = new InlineProgressWriter();
+        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -248,20 +250,21 @@ internal static class CliApplication
                 .BuildServiceProvider();
 
             var admin = services.GetRequiredService<ServerAdministrationService>();
-            AnsiConsole.MarkupLine("[grey]Downloading members and assigning MEMBER where needed. This can take a while on large servers.[/]");
             var progress = new Progress<SetMembersProgress>(report =>
             {
                 if (report.Phase == "Downloading members")
                 {
-                    AnsiConsole.MarkupLine("[grey]Downloading the member list from Discord...[/]");
+                    inlineProgress.Update("Downloading the member list from Discord...");
                     return;
                 }
 
                 var totalText = report.TotalUsers > 0 ? report.TotalUsers.ToString() : "?";
-                AnsiConsole.MarkupLine(
-                    $"[grey]Progress:[/] {report.ProcessedUsers}/{totalText} users handled; added {report.Added}, already had MEMBER {report.AlreadyHadMember}, skipped NEW {report.NewUsersSkipped}, skipped bots {report.BotsSkipped}, failed {report.Failed}.");
+                var etaText = FormatEta(report.ProcessedUsers, report.TotalUsers, stopwatch.Elapsed);
+                inlineProgress.Update(
+                    $"{report.ProcessedUsers}/{totalText} • add {report.Added} • had {report.AlreadyHadMember} • new {report.NewUsersSkipped} • bots {report.BotsSkipped} • fail {report.Failed}{etaText}");
             });
             var result = await admin.SetMembersAsync(settings, serverId, progress, CancellationToken.None);
+            inlineProgress.Complete();
 
             var table = new Table().AddColumns("Server", "Checked", "Added", "Already had MEMBER", "Skipped NEW", "Skipped bots", "Failed");
             table.AddRow(
@@ -277,11 +280,13 @@ internal static class CliApplication
         }
         catch (InvalidOperationException ex)
         {
+            inlineProgress.Complete();
             AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
             return 1;
         }
         catch (Exception ex)
         {
+            inlineProgress.Complete();
             AnsiConsole.MarkupLine($"[red]set-members failed:[/] {Markup.Escape(ex.Message)}");
             return 1;
         }
@@ -603,6 +608,77 @@ internal static class CliApplication
             Onboarding = server.Onboarding,
             SpamGuard = server.SpamGuard
         });
+    }
+
+    private static string FormatEta(int processedUsers, int totalUsers, TimeSpan elapsed)
+    {
+        if (processedUsers <= 0 || totalUsers <= 0 || processedUsers >= totalUsers || elapsed <= TimeSpan.Zero)
+            return string.Empty;
+
+        var usersPerSecond = processedUsers / elapsed.TotalSeconds;
+        if (usersPerSecond <= 0)
+            return string.Empty;
+
+        var remainingSeconds = (totalUsers - processedUsers) / usersPerSecond;
+        if (double.IsNaN(remainingSeconds) || double.IsInfinity(remainingSeconds) || remainingSeconds <= 0)
+            return string.Empty;
+
+        var remaining = TimeSpan.FromSeconds(Math.Ceiling(remainingSeconds));
+        if (remaining.TotalHours >= 1)
+            return $" • {remaining:h\\:mm\\:ss} left";
+
+        if (remaining.TotalMinutes >= 1)
+            return $" • {remaining:m\\:ss} left";
+
+        return $" • {Math.Max(1, remaining.Seconds)}s left";
+    }
+
+    private sealed class InlineProgressWriter
+    {
+        private readonly object syncRoot = new();
+        private readonly bool interactive = !Console.IsOutputRedirected;
+        private int lastTextLength;
+        private bool hasWritten;
+
+        public void Update(string text)
+        {
+            var safeText = text.Replace('\r', ' ').Replace('\n', ' ');
+
+            lock (syncRoot)
+            {
+                if (!interactive)
+                {
+                    AnsiConsole.MarkupLine($"[grey]{Markup.Escape(safeText)}[/]");
+                    return;
+                }
+
+                var paddedText = safeText.Length >= lastTextLength
+                    ? safeText
+                    : safeText + new string(' ', lastTextLength - safeText.Length);
+
+                Console.Write("\r");
+                Console.Write(paddedText);
+                Console.Out.Flush();
+
+                lastTextLength = safeText.Length;
+                hasWritten = true;
+            }
+        }
+
+        public void Complete()
+        {
+            lock (syncRoot)
+            {
+                if (!interactive || !hasWritten)
+                    return;
+
+                Console.WriteLine();
+                Console.Out.Flush();
+
+                lastTextLength = 0;
+                hasWritten = false;
+            }
+        }
     }
 
     private sealed record InviteUrlOptions(ulong? ServerId, ulong? ClientId, bool OpenBrowser);
