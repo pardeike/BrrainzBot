@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Source+Sans+3:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@300;400;600;700&display=swap");
 
 :root {
   --bb-ink: #17324d;
@@ -20,7 +20,7 @@
 }
 
 body {
-  font-family: "Source Sans 3", sans-serif;
+  font-family: "Manrope", sans-serif;
   color: var(--bb-ink);
   background:
     radial-gradient(circle at top left, rgba(47, 111, 228, 0.08), transparent 30%),
@@ -34,8 +34,8 @@ body {
 .md-header__title,
 .md-tabs__link,
 .md-nav__title {
-  font-family: "Space Grotesk", sans-serif;
-  letter-spacing: -0.02em;
+  font-family: "Sora", sans-serif;
+  letter-spacing: -0.03em;
 }
 
 .md-header {
@@ -142,8 +142,9 @@ body {
 .hero-copy h1 {
   margin: 0 0 1.1rem;
   font-size: clamp(2.6rem, 7vw, 4.7rem);
-  line-height: 0.95;
+  line-height: 0.92;
   color: var(--bb-ink);
+  font-weight: 600;
 }
 
 .hero-copy .lede {
@@ -209,8 +210,9 @@ body {
 .hero-point strong {
   display: block;
   margin-bottom: 0.3rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Sora", sans-serif;
   font-size: 1rem;
+  font-weight: 600;
 }
 
 .hero-visual {
@@ -270,7 +272,7 @@ body {
   display: inline-block;
   margin-bottom: 0.8rem;
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--bb-blue);
@@ -329,6 +331,7 @@ body {
 .bb-card h3 {
   margin: 0 0 0.65rem;
   font-size: 1.3rem;
+  font-weight: 600;
 }
 
 .bb-card p,
@@ -387,7 +390,7 @@ body {
   border-radius: 999px;
   background: var(--bb-ink);
   color: white;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Sora", sans-serif;
   font-weight: 700;
 }
 
