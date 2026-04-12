@@ -7,6 +7,17 @@ namespace BrrainzBot.Infrastructure;
 
 public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 {
+    private static readonly (string Name, Func<GuildPermissions, bool> HasPermission)[] RequiredBotPermissions =
+    [
+        ("View Channels", permissions => permissions.ViewChannel),
+        ("Read Message History", permissions => permissions.ReadMessageHistory),
+        ("Send Messages", permissions => permissions.SendMessages),
+        ("Manage Messages", permissions => permissions.ManageMessages),
+        ("Manage Roles", permissions => permissions.ManageRoles),
+        ("Manage Channels", permissions => permissions.ManageChannels),
+        ("Kick Members", permissions => permissions.KickMembers)
+    ];
+
     public async Task<DiagnosticReport> RunAsync(BotSettings settings, RuntimeSecrets secrets, AppPaths paths, CancellationToken cancellationToken)
     {
         var report = new DiagnosticReport();
@@ -218,7 +229,10 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 role => new RoleSnapshot(
                     ulong.Parse(role.GetProperty("id").GetString()!),
                     role.GetProperty("name").GetString() ?? "unknown",
-                    role.GetProperty("position").GetInt32()));
+                    role.GetProperty("position").GetInt32(),
+                    role.TryGetProperty("permissions", out var permissionsElement)
+                        ? ulong.Parse(permissionsElement.GetString() ?? "0")
+                        : 0));
     }
 
     private static void ValidateWelcomeLayout(ServerSettings server, ChannelSnapshot welcomeChannel, DiagnosticReport report)
@@ -278,11 +292,36 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             .Select(static value => ulong.Parse(value!))
             .ToList();
 
-        var highestBotRolePosition = botRoleIds
+        var botRoles = botRoleIds
             .Where(roles.ContainsKey)
-            .Select(roleId => roles[roleId].Position)
+            .Select(roleId => roles[roleId])
+            .ToList();
+
+        if (botRoles.Count == 0)
+        {
+            report.AddWarning("discord.botrole.unresolved", $"{server.Name}: could not resolve the bot roles in the server role list.");
+            return;
+        }
+
+        var highestBotRolePosition = botRoles
+            .Select(role => role.Position)
             .DefaultIfEmpty(int.MinValue)
             .Max();
+
+        var botPermissions = new GuildPermissions(botRoles
+            .Aggregate(0UL, (combined, role) => combined | role.PermissionsRawValue));
+
+        var missingPermissions = RequiredBotPermissions
+            .Where(requirement => !requirement.HasPermission(botPermissions))
+            .Select(requirement => requirement.Name)
+            .ToList();
+
+        if (missingPermissions.Count > 0)
+        {
+            report.AddError(
+                "discord.bot_permissions.missing",
+                $"{server.Name}: the bot is missing required server permissions: {string.Join(", ", missingPermissions)}.");
+        }
 
         if (roles.TryGetValue(server.NewRoleId, out var newRole) && highestBotRolePosition <= newRole.Position)
         {
@@ -317,5 +356,5 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 
     private sealed record PermissionOverwriteSnapshot(ulong Id, int Type, ulong Allow, ulong Deny);
 
-    private sealed record RoleSnapshot(ulong Id, string Name, int Position);
+    private sealed record RoleSnapshot(ulong Id, string Name, int Position, ulong PermissionsRawValue);
 }

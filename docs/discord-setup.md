@@ -64,13 +64,16 @@ Under **Scopes**, select:
 
 - `bot`
 
-Under **Bot Permissions**, select:
+Keep the scope simple. You do not need extra scopes for the current welcome flow.
+
+Under **Bot Permissions**, select all seven required permissions:
 
 - `View Channels`
 - `Read Message History`
 - `Send Messages`
 - `Manage Messages`
 - `Manage Roles`
+- `Manage Channels`
 - `Kick Members`
 
 Then copy the generated URL at the bottom.

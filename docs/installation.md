@@ -59,6 +59,7 @@ Use this any time you change:
 - server IDs
 - channel IDs
 - role IDs
+- Discord bot permissions
 - bot token
 - AI endpoint settings
 
