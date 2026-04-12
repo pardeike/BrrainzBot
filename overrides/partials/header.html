@@ -27,13 +27,11 @@
           </a>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
-          <span class="md-ellipsis">
-            {% if page.meta and page.meta.title %}
-              {{ page.meta.title }}
-            {% else %}
-              {{ page.title }}
-            {% endif %}
-          </span>
+          <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" class="md-header__site-link">
+            <span class="md-ellipsis">
+              {{ config.site_name }}
+            </span>
+          </a>
         </div>
       </div>
     </div>
