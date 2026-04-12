@@ -58,11 +58,18 @@ Simpler role model for small servers:
 
 ## 4. Create `#welcome`
 
-`#welcome` should:
+Standard setup:
 
-- be visible to `@everyone` and `NEW`
-- be hidden from `MEMBER`
-- not be used as a normal chat room
+- `#welcome` is visible to `@everyone` and `NEW`
+- `#welcome` is hidden from `MEMBER`
+
+Simple setup with `@everyone`:
+
+- `#welcome` is hidden from `@everyone`
+- `#welcome` is visible to `NEW`
+- approval hides it by removing `NEW`
+
+In both setups, `#welcome` should not be used as a normal chat room.
 
 The bot will place one persistent welcome message there and handle the rest with buttons, modals, and ephemeral replies.
 
