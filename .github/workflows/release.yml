@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Version tag to release, for example v0.1.0
+        description: Version to release, for example 0.1.0
         required: true
         type: string
 
@@ -34,11 +34,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Publish
-        shell: bash
-        run: |
-          VERSION="${{ inputs.version }}"
-          VERSION="${VERSION#v}"
-          dotnet publish src/BrrainzBot.Cli/BrrainzBot.Cli.csproj -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:Version=$VERSION -o artifacts/${{ matrix.rid }}
+        run: dotnet publish src/BrrainzBot.Cli/BrrainzBot.Cli.csproj -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -p:Version=${{ inputs.version }} -o artifacts/${{ matrix.rid }}
 
       - name: Archive (zip)
         if: matrix.archive == 'zip'
@@ -79,6 +75,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${{ inputs.version }}" dist/* \
-            --title "${{ inputs.version }}" \
+          gh release create "v${{ inputs.version }}" dist/* \
+            --title "v${{ inputs.version }}" \
             --generate-notes
