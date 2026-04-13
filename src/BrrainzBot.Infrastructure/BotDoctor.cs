@@ -327,8 +327,11 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             .DefaultIfEmpty(int.MinValue)
             .Max();
 
+        var everyonePermissions = roles.TryGetValue(server.ServerId, out var everyoneRole)
+            ? everyoneRole.PermissionsRawValue
+            : 0UL;
         var botPermissions = new GuildPermissions(botRoles
-            .Aggregate(0UL, (combined, role) => combined | role.PermissionsRawValue));
+            .Aggregate(everyonePermissions, (combined, role) => combined | role.PermissionsRawValue));
 
         return new BotStateSnapshot(botRoleIds, highestBotRolePosition, botPermissions);
     }

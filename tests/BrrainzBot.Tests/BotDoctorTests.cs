@@ -266,7 +266,29 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
-    public async Task DoctorWarnsWhenEveryoneHasPermissionsTheBotCannotCopyToMember()
+    public async Task DoctorCountsEveryonePermissionsForTheBot()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            everyonePermissions: AllRequiredPermissions(),
+            botPermissions: 0)));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.bot_permissions.missing");
+    }
+
+    [Fact]
+    public async Task DoctorDoesNotWarnAboutPartialCopyWhenBotInheritsTheNeededPermissionFromEveryone()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
             everyonePermissions: EveryonePermissionsWithCreateInvite())));
@@ -283,8 +305,7 @@ public sealed class BotDoctorTests
 
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
 
-        var message = Assert.Single(report.Messages, entry => entry.Code == "discord.memberrole.partial_copy");
-        Assert.Contains("Create Instant Invite", message.Message);
+        Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.memberrole.partial_copy");
     }
 
     [Fact]
