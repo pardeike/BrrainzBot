@@ -243,6 +243,140 @@ public sealed class BotDoctorTests
     }
 
     [Fact]
+    public async Task DoctorWarnsWhenEveryoneHasMoreThanTheReadOnlyBaseline()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            everyonePermissions: Pack(
+                GuildPermission.ViewChannel,
+                GuildPermission.ReadMessageHistory,
+                GuildPermission.SendMessages))));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        var message = Assert.Single(report.Messages, entry => entry.Code == "discord.everyone.permissions.too_permissive");
+        Assert.Contains("Send Messages", message.Message);
+    }
+
+    [Fact]
+    public async Task DoctorDoesNotWarnWhenEveryoneHasOnlyTheReadOnlyBaseline()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            everyonePermissions: Pack(
+                GuildPermission.ViewChannel,
+                GuildPermission.ReadMessageHistory))));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.everyone.permissions.too_permissive");
+    }
+
+    [Fact]
+    public async Task DoctorDoesNotWarnWhenEveryoneOnlyAddsUseClydeAi()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            everyonePermissions: Pack(
+                GuildPermission.ViewChannel,
+                GuildPermission.ReadMessageHistory,
+                GuildPermission.UseClydeAI))));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings()]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.everyone.permissions.too_permissive");
+    }
+
+    [Fact]
+    public async Task DoctorWarnsWhenUnverifiedUsersCanPostOutsideTheOnboardingPath()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            everyonePermissions: Pack(
+                GuildPermission.ViewChannel,
+                GuildPermission.ReadMessageHistory,
+                GuildPermission.SendMessages),
+            extraChannelsJson: """
+                ,
+                      {
+                        "id": "900",
+                        "type": 0,
+                        "name": "general",
+                        "permission_overwrites": []
+                      }
+                """)));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings(enableSpamGuard: true)]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        var message = Assert.Single(report.Messages, entry => entry.Code == "discord.onboarding.bypass.writable_channels");
+        Assert.Contains("#general", message.Message);
+    }
+
+    [Fact]
+    public async Task DoctorDoesNotWarnWhenOnlyTheHoneypotIsWritableForNewcomers()
+    {
+        var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
+            everyonePermissions: Pack(
+                GuildPermission.ViewChannel,
+                GuildPermission.ReadMessageHistory),
+            honeypotPermissionOverwrites: """
+                [
+                  { "id": "123", "type": 0, "allow": "2048", "deny": "0" }
+                ]
+                """)));
+
+        var settings = new BotSettings
+        {
+            Servers = [CreateServerSettings(enableSpamGuard: true)]
+        };
+        var secrets = new RuntimeSecrets
+        {
+            DiscordToken = "token"
+        };
+        var paths = CreatePathsWithPlaceholderFiles();
+
+        var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+
+        Assert.DoesNotContain(report.Messages, entry => entry.Code == "discord.onboarding.bypass.writable_channels");
+    }
+
+    [Fact]
     public async Task DoctorReportsMissingRequiredBotPermissions()
     {
         var doctor = new BotDoctor(new StubHttpClientFactory(HealthyResponder(
@@ -476,6 +610,8 @@ public sealed class BotDoctorTests
     private static Func<HttpRequestMessage, HttpResponseMessage> HealthyResponder(
         string? welcomePermissionOverwrites = null,
         string? categoryPermissionOverwrites = null,
+        string? honeypotPermissionOverwrites = null,
+        string? extraChannelsJson = null,
         ulong? everyonePermissions = null,
         ulong? memberPermissions = null,
         ulong? botPermissions = null,
@@ -492,6 +628,8 @@ public sealed class BotDoctorTests
         memberPermissions ??= 0;
         botPermissions ??= AllRequiredPermissions();
         categoryPermissionOverwrites ??= "[]";
+        honeypotPermissionOverwrites ??= "[]";
+        extraChannelsJson ??= string.Empty;
 
         var pages = memberPages.Length == 0
             ? new[]
@@ -518,20 +656,24 @@ public sealed class BotDoctorTests
                     [
                       {
                         "id": "789",
+                        "type": 4,
                         "name": "welcome-category",
                         "permission_overwrites": {{categoryPermissionOverwrites}}
                       },
                       {
                         "id": "456",
+                        "type": 0,
                         "name": "welcome",
                         "parent_id": "789",
                         "permission_overwrites": {{welcomePermissionOverwrites}}
                       },
                       {
                         "id": "654",
+                        "type": 0,
                         "name": "honeypot",
-                        "permission_overwrites": []
+                        "permission_overwrites": {{honeypotPermissionOverwrites}}
                       }
+                      {{extraChannelsJson}}
                     ]
                     """),
                 "/api/v10/guilds/123/roles" => JsonResponse($$"""

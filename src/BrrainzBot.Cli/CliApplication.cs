@@ -209,6 +209,12 @@ internal static class CliApplication
 
         var doctor = services.GetRequiredService<BotDoctor>();
         var report = await doctor.RunAsync(settings, secrets, paths, CancellationToken.None);
+        if (report.Messages.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[green]Doctor found no warnings or blocking problems.[/]");
+            return 0;
+        }
+
         var table = new Table().AddColumns("Severity", "Code", "Message");
         foreach (var message in report.Messages)
         {
@@ -222,11 +228,16 @@ internal static class CliApplication
         }
 
         AnsiConsole.Write(table);
-        AnsiConsole.WriteLine();
         if (report.HasErrors)
         {
             AnsiConsole.MarkupLine("[red]Doctor found blocking problems.[/]");
             return 1;
+        }
+
+        if (report.Messages.Any(message => message.Severity == DiagnosticSeverity.Warning))
+        {
+            AnsiConsole.MarkupLine("[yellow]Doctor finished with warnings but no blocking problems.[/]");
+            return 0;
         }
 
         AnsiConsole.MarkupLine("[green]Doctor finished without blocking problems.[/]");

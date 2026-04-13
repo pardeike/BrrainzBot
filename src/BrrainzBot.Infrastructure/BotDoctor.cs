@@ -7,6 +7,11 @@ namespace BrrainzBot.Infrastructure;
 
 public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
 {
+    private static readonly ulong RecommendedEveryoneBaselinePermissions =
+        (ulong)GuildPermission.ViewChannel
+        | (ulong)GuildPermission.ReadMessageHistory
+        | (ulong)GuildPermission.UseClydeAI;
+
     private static readonly (string Name, Func<GuildPermissions, bool> HasPermission)[] RequiredBotPermissions =
     [
         ("View Channels", permissions => permissions.ViewChannel),
@@ -144,6 +149,11 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 ValidateWelcomeLayout(server, welcomeChannel, channels, roles, botState, report);
             }
 
+            if (roles != null)
+            {
+                ValidateNewcomerPostingLayout(server, channels, roles, report);
+            }
+
             if (server.EnableSpamGuard && !channels.ContainsKey(server.SpamGuard.HoneypotChannelId))
                 report.AddError("discord.honeypot.notfound", $"{server.Name}: HoneypotChannelId does not exist in the server.");
         }
@@ -181,6 +191,12 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             if (!ulong.TryParse(channelElement.GetProperty("id").GetString(), out var channelId))
                 continue;
 
+            var channelType = channelElement.TryGetProperty("type", out var channelTypeElement)
+                ? channelTypeElement.ValueKind == JsonValueKind.String
+                    ? int.Parse(channelTypeElement.GetString() ?? "0")
+                    : channelTypeElement.GetInt32()
+                : 0;
+
             var overwrites = new List<PermissionOverwriteSnapshot>();
             if (channelElement.TryGetProperty("permission_overwrites", out var overwriteArray))
             {
@@ -204,11 +220,12 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
             channels[channelId] = new ChannelSnapshot(
                 channelId,
                 channelElement.GetProperty("name").GetString() ?? channelId.ToString(),
-                    channelElement.TryGetProperty("parent_id", out var parentIdElement)
-                        && ulong.TryParse(parentIdElement.GetString(), out var parentId)
-                        ? parentId
-                        : null,
-                    overwrites);
+                channelType,
+                channelElement.TryGetProperty("parent_id", out var parentIdElement)
+                    && ulong.TryParse(parentIdElement.GetString(), out var parentId)
+                    ? parentId
+                    : null,
+                overwrites);
         }
 
         return channels;
@@ -284,6 +301,45 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         }
     }
 
+    private static void ValidateNewcomerPostingLayout(
+        ServerSettings server,
+        IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        DiagnosticReport report)
+    {
+        var excludedChannelIds = new HashSet<ulong>();
+        if (server.WelcomeChannelId != 0)
+            excludedChannelIds.Add(server.WelcomeChannelId);
+        if (server.EnableSpamGuard && server.SpamGuard.HoneypotChannelId != 0)
+            excludedChannelIds.Add(server.SpamGuard.HoneypotChannelId);
+
+        var writableChannels = channels.Values
+            .Where(static channel => channel.SupportsMessagePosting)
+            .Where(channel => !excludedChannelIds.Contains(channel.Id))
+            .Where(channel => HasEffectiveViewAccess(channel, channels, roles, server.ServerId, []))
+            .Where(channel => HasEffectiveChannelPermission(channel, channels, roles, server.ServerId, [], ChannelPermission.SendMessages))
+            .Select(channel => $"#{channel.Name}")
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (writableChannels.Count == 0)
+            return;
+
+        var preview = writableChannels.Take(5).ToArray();
+        var remainingCount = writableChannels.Count - preview.Length;
+        var previewText = string.Join(", ", preview);
+        if (remainingCount > 0)
+            previewText = $"{previewText} and {remainingCount} more";
+
+        var allowedScope = server.EnableSpamGuard
+            ? "#welcome and the honeypot"
+            : "#welcome";
+
+        report.AddWarning(
+            "discord.onboarding.bypass.writable_channels",
+            $"{server.Name}: people without MEMBER can still post outside {allowedScope} in {writableChannels.Count} channel(s): {previewText}. Deny Send Messages for @everyone (or the newcomer baseline) in those channels if you want onboarding to gate normal access.");
+    }
+
     private static async Task<BotStateSnapshot?> LoadBotStateAsync(
         HttpClient client,
         ulong botUserId,
@@ -342,6 +398,18 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         BotStateSnapshot? botState,
         DiagnosticReport report)
     {
+        if (roles.TryGetValue(server.ServerId, out var everyoneRole))
+        {
+            var extraEveryonePermissions = DescribeGuildPermissions(
+                everyoneRole.PermissionsRawValue & ~RecommendedEveryoneBaselinePermissions);
+            if (extraEveryonePermissions.Count > 0)
+            {
+                report.AddWarning(
+                    "discord.everyone.permissions.too_permissive",
+                    $"{server.Name}: @everyone has more than the recommended onboarding baseline. Keep @everyone to View Channels and Read Message History if onboarding should gate access. Doctor ignores harmless Discord defaults such as Use Clyde AI. Extra permissions currently on @everyone: {string.Join(", ", extraEveryonePermissions)}.");
+            }
+        }
+
         if (botState == null)
             return;
 
@@ -357,11 +425,11 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
                 $"{server.Name}: the bot is missing required server permissions: {string.Join(", ", missingPermissions)}.");
         }
 
-        if (roles.TryGetValue(server.ServerId, out var everyoneRole)
+        if (roles.TryGetValue(server.ServerId, out var everyoneRoleForCopyCheck)
             && roles.TryGetValue(server.MemberRoleId, out var memberRoleForCopyCheck))
         {
             var uncopiableMissingPermissions = DescribeGuildPermissions(
-                everyoneRole.PermissionsRawValue
+                everyoneRoleForCopyCheck.PermissionsRawValue
                 & ~botState.GuildPermissions.RawValue
                 & ~memberRoleForCopyCheck.PermissionsRawValue);
             if (uncopiableMissingPermissions.Count > 0)
@@ -474,6 +542,18 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         return (permissions & PermissionBit(ChannelPermission.ViewChannel)) != 0;
     }
 
+    private static bool HasEffectiveChannelPermission(
+        ChannelSnapshot channel,
+        IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
+        IReadOnlyDictionary<ulong, RoleSnapshot> roles,
+        ulong everyoneRoleId,
+        IReadOnlyList<ulong> roleIds,
+        ChannelPermission permission)
+    {
+        var permissions = GetEffectiveChannelPermissions(channel, channels, roles, everyoneRoleId, roleIds);
+        return (permissions & PermissionBit(permission)) != 0;
+    }
+
     private static ulong GetEffectiveChannelPermissions(
         ChannelSnapshot channel,
         IReadOnlyDictionary<ulong, ChannelSnapshot> channels,
@@ -545,28 +625,16 @@ public sealed class BotDoctor(IHttpClientFactory httpClientFactory)
         if (string.IsNullOrWhiteSpace(name))
             return name;
 
-        var parts = new List<string>();
-        var current = new System.Text.StringBuilder();
-
-        foreach (var character in name)
-        {
-            if (current.Length > 0 && char.IsUpper(character))
-            {
-                parts.Add(current.ToString());
-                current.Clear();
-            }
-
-            current.Append(character);
-        }
-
-        if (current.Length > 0)
-            parts.Add(current.ToString());
-
-        return string.Join(' ', parts);
+        return System.Text.RegularExpressions.Regex.Replace(
+            name,
+            "(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])",
+            " ");
     }
 
-    private sealed record ChannelSnapshot(ulong Id, string Name, ulong? ParentCategoryId, List<PermissionOverwriteSnapshot> Overwrites)
+    private sealed record ChannelSnapshot(ulong Id, string Name, int Type, ulong? ParentCategoryId, List<PermissionOverwriteSnapshot> Overwrites)
     {
+        public bool SupportsMessagePosting => Type is 0 or 5;
+
         public PermissionOverwriteSnapshot? FindRoleOverwrite(ulong roleId) =>
             Overwrites.FirstOrDefault(overwrite => overwrite.Type == 0 && overwrite.Id == roleId);
     }
