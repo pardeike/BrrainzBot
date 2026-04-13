@@ -14,6 +14,7 @@ public sealed class ServerAdministrationService(
     ILogger<ServerAdministrationService> logger)
 {
     private const int SetMembersParallelism = 8;
+    private const ulong ViewChannelPermissionBit = (ulong)ChannelPermission.ViewChannel;
 
     public async Task<CreateMemberRoleResult> CreateMemberRoleAsync(
         BotSettings settings,
@@ -76,62 +77,63 @@ public sealed class ServerAdministrationService(
                 {
                     var everyoneOverwrite = channel.GetPermissionOverwrite(everyoneRole);
                     var memberOverwrite = channel.GetPermissionOverwrite(memberRole);
+                    var currentAllow = memberOverwrite?.AllowValue ?? 0;
+                    var currentDeny = memberOverwrite?.DenyValue ?? 0;
+                    var targetAllow = currentAllow;
+                    var targetDeny = currentDeny;
+                    var hasTargetOverwrite = false;
+                    var removeWhenEmpty = false;
+                    var isWelcomeChannel = channel.Id == serverSettings.WelcomeChannelId;
 
                     if (everyoneOverwrite is { } overwrite)
                     {
-                        var currentAllow = memberOverwrite?.AllowValue ?? 0;
-                        var currentDeny = memberOverwrite?.DenyValue ?? 0;
                         var preservedAllow = currentAllow & ~grantablePermissionsRaw;
                         var preservedDeny = currentDeny & ~grantablePermissionsRaw;
-                        var targetAllow = preservedAllow | (overwrite.AllowValue & grantablePermissionsRaw);
-                        var targetDeny = preservedDeny | (overwrite.DenyValue & grantablePermissionsRaw);
-
-                        try
-                        {
-                            if (currentAllow != targetAllow || currentDeny != targetDeny)
-                            {
-                                await channel.AddPermissionOverwriteAsync(memberRole, new OverwritePermissions(targetAllow, targetDeny));
-                                copiedOverwrites++;
-                            }
-                        }
-                        catch (HttpException ex) when (IsMissingPermissions(ex))
-                        {
-                            skippedChannels.Add(channel.Name);
-                            logger.LogWarning(
-                                ex,
-                                "Skipping MEMBER overwrite copy for channel {ChannelName} in server {ServerId}",
-                                channel.Name,
-                                server.Id);
-                        }
+                        targetAllow = preservedAllow | (overwrite.AllowValue & grantablePermissionsRaw);
+                        targetDeny = preservedDeny | (overwrite.DenyValue & grantablePermissionsRaw);
+                        hasTargetOverwrite = true;
+                        removeWhenEmpty = false;
                     }
                     else if (memberOverwrite.HasValue)
                     {
-                        var currentAllow = memberOverwrite.Value.AllowValue;
-                        var currentDeny = memberOverwrite.Value.DenyValue;
-                        var targetAllow = currentAllow & ~grantablePermissionsRaw;
-                        var targetDeny = currentDeny & ~grantablePermissionsRaw;
+                        targetAllow = currentAllow & ~grantablePermissionsRaw;
+                        targetDeny = currentDeny & ~grantablePermissionsRaw;
+                        hasTargetOverwrite = true;
+                        removeWhenEmpty = true;
+                    }
 
-                        try
+                    if (isWelcomeChannel)
+                    {
+                        targetAllow &= ~ViewChannelPermissionBit;
+                        targetDeny |= ViewChannelPermissionBit;
+                        hasTargetOverwrite = true;
+                        removeWhenEmpty = false;
+                    }
+
+                    if (!hasTargetOverwrite)
+                        continue;
+
+                    try
+                    {
+                        if (removeWhenEmpty && targetAllow == 0 && targetDeny == 0)
                         {
-                            if (targetAllow == 0 && targetDeny == 0)
-                            {
-                                await channel.RemovePermissionOverwriteAsync(memberRole);
-                                removedOverwrites++;
-                            }
-                            else if (currentAllow != targetAllow || currentDeny != targetDeny)
-                            {
-                                await channel.AddPermissionOverwriteAsync(memberRole, new OverwritePermissions(targetAllow, targetDeny));
-                            }
+                            await channel.RemovePermissionOverwriteAsync(memberRole);
+                            removedOverwrites++;
                         }
-                        catch (HttpException ex) when (IsMissingPermissions(ex))
+                        else if (currentAllow != targetAllow || currentDeny != targetDeny)
                         {
-                            skippedChannels.Add(channel.Name);
-                            logger.LogWarning(
-                                ex,
-                                "Skipping MEMBER overwrite removal for channel {ChannelName} in server {ServerId}",
-                                channel.Name,
-                                server.Id);
+                            await channel.AddPermissionOverwriteAsync(memberRole, new OverwritePermissions(targetAllow, targetDeny));
+                            copiedOverwrites++;
                         }
+                    }
+                    catch (HttpException ex) when (IsMissingPermissions(ex))
+                    {
+                        skippedChannels.Add(channel.Name);
+                        logger.LogWarning(
+                            ex,
+                            "Skipping MEMBER overwrite sync for channel {ChannelName} in server {ServerId}",
+                            channel.Name,
+                            server.Id);
                     }
                 }
 
