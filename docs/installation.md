@@ -55,6 +55,7 @@ Safe default:
 
 - servers start out off until you turn them on
 - rerunning `setup` edits the existing install
+- `add` appends one more server without revisiting the install-wide questions
 
 ## 3. Create or Sync `MEMBER` if Needed
 
@@ -109,6 +110,14 @@ The process stays connected to Discord and picks up per-server on/off changes wh
 ```
 
 This opens the same guided flow with your current values filled in.
+
+## 8. Add Another Server Later
+
+```bash
+./brrainzbot add
+```
+
+This skips the install-wide questions and jumps straight to one new server.
 
 ## Optional: Custom Storage Root
 

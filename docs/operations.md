@@ -14,6 +14,14 @@ The process stays connected to Discord and keeps honoring per-server on/off chan
 ./brrainzbot status
 ```
 
+## Add Another Server
+
+```bash
+./brrainzbot add
+```
+
+This appends one new server without revisiting the install-wide token, AI, and self-update setup.
+
 ## Turn a Server On or Off
 
 ```bash

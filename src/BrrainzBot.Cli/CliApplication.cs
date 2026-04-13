@@ -23,6 +23,7 @@ internal static class CliApplication
         {
             "help" or "--help" or "-h" => ShowHelp(),
             "setup" => await SetupAsync(paths),
+            "add" => await AddServerAsync(paths, commandArgs),
             "status" => await StatusAsync(paths, commandArgs),
             "enable" => await EnableDisableAsync(paths, commandArgs, isActive: true),
             "disable" => await EnableDisableAsync(paths, commandArgs, isActive: false),
@@ -46,6 +47,7 @@ internal static class CliApplication
         AnsiConsole.MarkupLine("Usage: [aqua]brrainzbot[/] <command> [grey][[--root path]][/]");
         AnsiConsole.MarkupLine("Commands:");
         AnsiConsole.MarkupLine("  [green]setup[/]         Create or update the configuration with a guided wizard.");
+        AnsiConsole.MarkupLine("  [green]add[/]           Append one new server without revisiting install-wide setup.");
         AnsiConsole.MarkupLine("  [green]status[/]        Show per-server activation and feature state.");
         AnsiConsole.MarkupLine("  [green]enable[/]        Turn one server on without rerunning setup.");
         AnsiConsole.MarkupLine("  [green]disable[/]       Turn one server off without rerunning setup.");
@@ -86,9 +88,60 @@ internal static class CliApplication
         }
         AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot doctor[/] to validate the setup.");
         AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot status[/] to review your configured servers.");
+        AnsiConsole.MarkupLine($"  {step++}. Use [aqua]brrainzbot add[/] later if you want to append another server without revisiting the install-wide setup.");
         AnsiConsole.MarkupLine($"  {step++}. Use [aqua]brrainzbot enable <serverId>[/] when you are ready to go live.");
         AnsiConsole.MarkupLine($"  {step}. Run [aqua]brrainzbot run[/] when you are ready.");
         return 0;
+    }
+
+    private static async Task<int> AddServerAsync(AppPaths paths, IReadOnlyList<string> args)
+    {
+        if (args.Count != 0)
+        {
+            AnsiConsole.MarkupLine("[red]Usage:[/] [aqua]brrainzbot add[/]");
+            return 1;
+        }
+
+        try
+        {
+            var store = new BotConfigurationStore();
+            var existing = await LoadRequiredConfigurationAsync(paths);
+            var newServer = SetupWizard.RunAddServer(existing.Settings, paths);
+
+            if (existing.Settings.Servers.Any(server => server.ServerId == newServer.ServerId))
+            {
+                AnsiConsole.MarkupLine(
+                    $"[red]This install already has server[/] [aqua]{newServer.ServerId}[/]. Use [aqua]brrainzbot setup[/] if you want to edit it.");
+                return 1;
+            }
+
+            var updatedSettings = new BotSettings
+            {
+                FriendlyName = existing.Settings.FriendlyName,
+                GitHubRepository = existing.Settings.GitHubRepository,
+                Updates = existing.Settings.Updates,
+                Ai = existing.Settings.Ai,
+                Servers = [.. existing.Settings.Servers, newServer]
+            };
+
+            await store.SaveAsync(paths, updatedSettings, existing.Secrets, CancellationToken.None);
+
+            AnsiConsole.MarkupLine($"[green]Added server[/] [aqua]{newServer.Name}[/] ([grey]{newServer.ServerId}[/]).");
+            AnsiConsole.MarkupLine($"[green]Saved configuration to[/] {Markup.Escape(paths.ConfigFilePath)}");
+            AnsiConsole.MarkupLine("Next steps:");
+            var step = 1;
+            if (newServer.MemberRoleId == 0)
+                AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot create-member {newServer.ServerId}[/] if you want BrrainzBot to create or sync MEMBER.");
+            AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot doctor[/] to validate the new server.");
+            AnsiConsole.MarkupLine($"  {step++}. Run [aqua]brrainzbot status[/] to review all configured servers.");
+            AnsiConsole.MarkupLine($"  {step}. Use [aqua]brrainzbot enable {newServer.ServerId}[/] when you are ready.");
+            return 0;
+        }
+        catch (FileNotFoundException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+            return 1;
+        }
     }
 
     private static async Task<int> StatusAsync(AppPaths paths, IReadOnlyList<string> args)

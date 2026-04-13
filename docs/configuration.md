@@ -26,6 +26,7 @@ The setup wizard writes both for you.
 
 ```bash
 ./brrainzbot setup
+./brrainzbot add
 ./brrainzbot status
 ./brrainzbot doctor
 ./brrainzbot print-config

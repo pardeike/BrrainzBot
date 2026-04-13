@@ -66,6 +66,18 @@ internal static class SetupWizard
         return (settings, secrets);
     }
 
+    public static ServerSettings RunAddServer(BotSettings existingSettings, AppPaths paths)
+    {
+        AnsiConsole.Write(new FigletText("Add").Color(Color.CornflowerBlue));
+        AnsiConsole.MarkupLine($"This wizard appends one server to [grey]{Markup.Escape(paths.RootDirectory)}[/].");
+        AnsiConsole.MarkupLine($"Guides: [link]{DocsHomeUrl}[/]  [grey]|[/]  Discord: [link]{DiscordSetupUrl}[/]");
+        AnsiConsole.WriteLine();
+
+        WriteSectionHeader("Add one server", "This skips the existing install-wide setup and only asks for the new server.");
+        var template = existingSettings.Servers.LastOrDefault();
+        return BuildServerSettings(template);
+    }
+
     private static List<ServerSettings> BuildServers(IReadOnlyList<ServerSettings> existingServers)
     {
         var servers = new List<ServerSettings>();
@@ -77,7 +89,7 @@ internal static class SetupWizard
             WriteSectionHeader(
                 $"Server {index + 1}",
                 index == 0
-                    ? "Set up one server fully first. You can add more later by rerunning setup."
+                    ? "Set up one server fully first. You can add more later with `brrainzbot add`."
                     : "You can keep values from the previous server, then change only what is different.");
 
             servers.Add(BuildServerSettings(existingServer));

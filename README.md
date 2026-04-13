@@ -18,6 +18,8 @@ It is built for admins who want plain setup, plain docs, and calm day-to-day beh
 5. Turn one server on with `brrainzbot enable <serverId>`.
 6. Run `brrainzbot run`.
 
+If you add another server later, run `brrainzbot add`.
+
 If you only manage one server, `brrainzbot enable` and `brrainzbot disable` also work without an ID.
 
 If you want the exact Discord invite link without using the portal generator:
@@ -47,6 +49,7 @@ brrainzbot invite-url
 
 ```bash
 brrainzbot setup
+brrainzbot add
 brrainzbot doctor
 brrainzbot status
 brrainzbot enable <serverId>
