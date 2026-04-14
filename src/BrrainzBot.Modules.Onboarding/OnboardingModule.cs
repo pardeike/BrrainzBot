@@ -124,10 +124,13 @@ public sealed class OnboardingModule(
 
         try
         {
+            await modal.DeferAsync(ephemeral: true);
+
             var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
             if (session.CooldownUntil is { } cooldownUntil && cooldownUntil > DateTimeOffset.UtcNow)
             {
-                await modal.RespondAsync(
+                await RespondToModalAsync(
+                    modal,
                     $"Please give it a moment before retrying. You can try again <t:{cooldownUntil.ToUnixTimeSeconds()}:R>.",
                     ephemeral: true);
                 return;
@@ -135,7 +138,7 @@ public sealed class OnboardingModule(
 
             if (session.AttemptCount >= serverSettings.Onboarding.MaxAttempts)
             {
-                await modal.RespondAsync("You have already used all verification attempts.", ephemeral: true);
+                await RespondToModalAsync(modal, "You have already used all verification attempts.", ephemeral: true);
                 return;
             }
 
@@ -158,7 +161,8 @@ public sealed class OnboardingModule(
                     reason = "low_signal_submission",
                     attempt = session.AttemptCount
                 }, CancellationToken.None);
-                await modal.RespondAsync(
+                await RespondToModalAsync(
+                    modal,
                     "Please answer with short real sentences about why you are here and what you want to do. Placeholder replies do not work here.",
                     ephemeral: true);
                 return;
@@ -209,7 +213,10 @@ public sealed class OnboardingModule(
                 userId = modal.User.Id,
                 error = ex.Message
             }, CancellationToken.None);
-            await modal.RespondAsync("Something went wrong on the bot side. I’ve kept you in the welcome area and notified the server owner.", ephemeral: true);
+            await RespondToModalAsync(
+                modal,
+                "Something went wrong on the bot side. I’ve kept you in the welcome area and notified the server owner.",
+                ephemeral: true);
         }
         finally
         {
@@ -236,7 +243,7 @@ public sealed class OnboardingModule(
             reason = decision.Reason,
             confidence = decision.Confidence
         }, CancellationToken.None);
-        await modal.RespondAsync(decision.FriendlyReply, ephemeral: true);
+        await RespondToModalAsync(modal, decision.FriendlyReply, ephemeral: true);
     }
 
     private async Task RetryAsync(SocketModal modal, ServerSettings serverSettings, VerificationSession session, VerificationDecision decision, bool notifyOwner)
@@ -260,7 +267,14 @@ public sealed class OnboardingModule(
                 $"Uncertain verification in {serverSettings.Name} for {modal.User.Username} ({modal.User.Id}). Reason: {decision.Reason}");
         }
 
-        await modal.RespondAsync(decision.FriendlyReply, ephemeral: true);
+        await RespondToModalAsync(modal, decision.FriendlyReply, ephemeral: true);
+    }
+
+    private static Task RespondToModalAsync(SocketModal modal, string text, bool ephemeral)
+    {
+        return modal.HasResponded
+            ? modal.FollowupAsync(text, ephemeral: ephemeral)
+            : modal.RespondAsync(text, ephemeral: ephemeral);
     }
 
     private async Task NotifyOwnerAsync(ServerSettings serverSettings, string content)

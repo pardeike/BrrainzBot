@@ -8,7 +8,7 @@ public sealed class GitHubReleaseService(IHttpClientFactory httpClientFactory)
     public async Task<GitHubReleaseInfo?> GetLatestAsync(string repository, CancellationToken cancellationToken)
     {
         var client = httpClientFactory.CreateClient(ServiceCollectionExtensions.GitHubHttpClientName);
-        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("BrrainzBot", "0.1.0"));
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("BrrainzBot", "0.1.1"));
         using var response = await client.GetAsync($"repos/{repository}/releases/latest", cancellationToken);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             return null;
