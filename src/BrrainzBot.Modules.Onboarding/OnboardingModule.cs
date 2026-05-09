@@ -122,11 +122,14 @@ public sealed class OnboardingModule(
             return;
         }
 
+        VerificationSession? session = null;
+        VerificationSessionSnapshot? sessionSnapshot = null;
+
         try
         {
             await modal.DeferAsync(ephemeral: true);
 
-            var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
+            session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
             if (session.CooldownUntil is { } cooldownUntil && cooldownUntil > DateTimeOffset.UtcNow)
             {
                 await RespondToModalAsync(
@@ -148,6 +151,7 @@ public sealed class OnboardingModule(
                 OnboardingInputGuard.SanitizeAnswer(answersById.GetValueOrDefault(WhatDoYouWantCustomId, string.Empty)),
                 OnboardingInputGuard.SanitizeAnswer(answersById.GetValueOrDefault(RuleParaphraseCustomId, string.Empty)));
 
+            sessionSnapshot = OnboardingFailurePolicy.CaptureSessionState(session);
             session.AttemptCount++;
             session.CooldownUntil = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.Cooldown);
             await sessionStore.UpsertAsync(session, CancellationToken.None);
@@ -198,7 +202,37 @@ public sealed class OnboardingModule(
         catch (Exception ex)
         {
             logger.LogError(ex, "Verification failed for user {UserId} in server {ServerId}", modal.User.Id, serverId);
-            var session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
+
+            if (session != null && sessionSnapshot != null && ex is RoleAssignmentTransientFailureException roleAssignmentFailure)
+            {
+                OnboardingFailurePolicy.RestoreSessionState(session, sessionSnapshot);
+                await sessionStore.UpsertAsync(session, CancellationToken.None);
+
+                if (serverSettings.Onboarding.NotifyOwnerOnTechnicalFailure)
+                {
+                    await NotifyOwnerAsync(
+                        serverSettings,
+                        $"Discord role assignment failed after approving {modal.User.Username} ({modal.User.Id}). " +
+                        $"Discord returned {(int)roleAssignmentFailure.HttpException.HttpCode} {roleAssignmentFailure.HttpException.HttpCode}. " +
+                        "The verification attempt was restored.");
+                }
+
+                await auditLog.WriteAsync("verification_technical_failure", new
+                {
+                    serverId,
+                    userId = modal.User.Id,
+                    error = roleAssignmentFailure.Message,
+                    phase = "approval_role_assignment",
+                    attemptRestored = true
+                }, CancellationToken.None);
+                await RespondToModalAsync(
+                    modal,
+                    "Discord is temporarily failing to update roles. Your verification attempt was not counted. Please try again in a moment.",
+                    ephemeral: true);
+                return;
+            }
+
+            session = await GetOrCreateSessionAsync(serverId, modal.User, serverSettings.Onboarding.StaleTimeout);
             session.LastDecisionReason = ex.Message;
             session.LastOutcome = VerificationOutcome.Uncertain;
             session.CooldownUntil = DateTimeOffset.UtcNow.Add(serverSettings.Onboarding.Cooldown);
@@ -233,7 +267,25 @@ public sealed class OnboardingModule(
 
         var memberRole = server.GetRole(serverSettings.MemberRoleId)
             ?? throw new InvalidOperationException("The member role is missing for approval.");
-        await member.AddRoleAsync(memberRole);
+        try
+        {
+            await OnboardingFailurePolicy.RunWithTransientDiscordRetriesAsync(
+                () => member.AddRoleAsync(memberRole),
+                (attempt, delay, ex) => logger.LogWarning(
+                    ex,
+                    "Transient Discord error {StatusCode} while granting role {RoleId} to user {UserId} in server {ServerId}. Retry {RetryAttempt} in {DelayMs} ms.",
+                    (int)ex.HttpCode,
+                    memberRole.Id,
+                    modal.User.Id,
+                    serverSettings.ServerId,
+                    attempt,
+                    (int)delay.TotalMilliseconds),
+                cancellationToken: CancellationToken.None);
+        }
+        catch (HttpException ex) when (OnboardingFailurePolicy.ShouldRestoreAttempt(ex))
+        {
+            throw new RoleAssignmentTransientFailureException(ex);
+        }
 
         await sessionStore.RemoveAsync(session.ServerId, session.UserId, CancellationToken.None);
         await auditLog.WriteAsync("verification_approved", new
