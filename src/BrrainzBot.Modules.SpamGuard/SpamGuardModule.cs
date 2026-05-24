@@ -1,7 +1,9 @@
 using BrrainzBot.Host;
 using Discord;
+using Discord.Net;
 using Discord.WebSocket;
 using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace BrrainzBot.Modules.SpamGuard;
 
@@ -47,7 +49,16 @@ public sealed class SpamGuardModule(
         switch (result)
         {
             case SpamDetectionResult.HoneypotTriggered:
+                await DeleteMessageAsync(message, channel.Name, "honeypot_triggered");
+                await DeleteUserMessagesInIntervalAsync(
+                    channel.Guild,
+                    message.Author.Id,
+                    message.Timestamp.AddSeconds(-spamSettings.PastMessageIntervalSeconds),
+                    message.Timestamp.AddSeconds(spamSettings.FutureMessageIntervalSeconds),
+                    message.Author.Username);
+                break;
             case SpamDetectionResult.DuplicateDetected:
+                await DeleteMessageAsync(message, channel.Name, "duplicate_spam");
                 await DeleteUserMessagesInIntervalAsync(
                     channel.Guild,
                     message.Author.Id,
@@ -82,7 +93,21 @@ public sealed class SpamGuardModule(
             if (!permissions.ViewChannel || !permissions.ReadMessageHistory || !permissions.ManageMessages)
                 continue;
 
-            var messages = await channel.GetMessagesAsync(100).FlattenAsync();
+            IEnumerable<IMessage> messages;
+            try
+            {
+                messages = await channel.GetMessagesAsync(100).FlattenAsync();
+            }
+            catch (HttpException ex) when (IsExpectedChannelPermissionError(ex))
+            {
+                continue;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Skipped #{Channel} during spam cleanup for {User}", channel.Name, userName);
+                continue;
+            }
+
             var userMessages = messages
                 .Where(m => m.Author.Id == userId && m.Timestamp >= startTime && m.Timestamp <= endTime)
                 .ToList();
@@ -95,6 +120,10 @@ public sealed class SpamGuardModule(
             logger.LogInformation("Checked #{Channel} for spam cleanup of {User}", channel.Name, userName);
         }
     }
+
+    private static bool IsExpectedChannelPermissionError(HttpException ex) =>
+        ex.HttpCode == HttpStatusCode.Forbidden &&
+        ex.DiscordCode is DiscordErrorCode.MissingPermissions or DiscordErrorCode.InsufficientPermissions;
 
     private async Task DeleteMessageAsync(IMessage message, string channelName, string reason)
     {
