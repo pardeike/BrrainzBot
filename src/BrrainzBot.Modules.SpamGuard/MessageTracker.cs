@@ -13,9 +13,6 @@ public sealed class MessageTracker(int deltaInterval, int minimumMessageLength, 
         string content,
         DateTimeOffset timestamp)
     {
-        if (string.IsNullOrWhiteSpace(content))
-            return (SpamDetectionResult.Ignored, 0);
-
         CleanupHoneypotDetections(timestamp, deltaInterval);
 
         if (_honeypotDetectedUsers.TryGetValue(userId, out var detectionTime) &&
@@ -27,6 +24,9 @@ public sealed class MessageTracker(int deltaInterval, int minimumMessageLength, 
             _honeypotDetectedUsers[userId] = timestamp;
             return (SpamDetectionResult.HoneypotTriggered, 0);
         }
+
+        if (string.IsNullOrWhiteSpace(content))
+            return (SpamDetectionResult.Ignored, 0);
 
         if (!ShouldTrackMessage(content, minimumMessageLength, linkRequired))
             return (SpamDetectionResult.Ignored, 0);

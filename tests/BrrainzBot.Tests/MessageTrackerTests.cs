@@ -15,6 +15,28 @@ public sealed class MessageTrackerTests
     }
 
     [Fact]
+    public void HoneypotMessageWithoutTextFlagsUserImmediately()
+    {
+        var tracker = new MessageTracker(120, 10, linkRequired: false, 0.85, 100);
+
+        var (result, _) = tracker.CheckMessage(42, 100, string.Empty, DateTimeOffset.UtcNow);
+
+        Assert.Equal(SpamDetectionResult.HoneypotTriggered, result);
+    }
+
+    [Fact]
+    public void HoneypotDetectedUserWithoutTextIsDetected()
+    {
+        var tracker = new MessageTracker(120, 10, linkRequired: false, 0.85, 100);
+        var now = DateTimeOffset.UtcNow;
+        _ = tracker.CheckMessage(42, 100, string.Empty, now);
+
+        var (result, _) = tracker.CheckMessage(42, 101, string.Empty, now.AddSeconds(10));
+
+        Assert.Equal(SpamDetectionResult.HoneypotDetected, result);
+    }
+
+    [Fact]
     public void SimilarMessagesInDifferentChannelsAreDetected()
     {
         var tracker = new MessageTracker(120, 10, linkRequired: false, 0.85, 500);
